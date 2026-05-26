@@ -1,0 +1,47 @@
+# spring 配置应用级基础信息和默认激活环境。
+spring:
+  # application.name 用于日志、监控和服务识别。
+  application:
+    name: cooperation-backend
+  # profiles.active 指定默认环境，本地开发建议使用 local。
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+# server 配置 HTTP 服务监听参数。
+server:
+  # port 指定后端服务端口，取值范围 1-65535。
+  port: ${SERVER_PORT:8080}
+
+# logging 配置日志输出级别，避免默认输出过多框架细节。
+logging:
+  # level.root 指定全局日志级别，建议本地 INFO，排查问题时可临时改为 DEBUG。
+  level:
+    root: INFO
+    # com.cooperation 指定项目代码日志级别。
+    com.cooperation: ${APP_LOG_LEVEL:INFO}
+
+# app 配置系统自定义参数。
+app:
+  # file-storage 保存文件存储相关配置。
+  file-storage:
+    # root 指定上传文件、回收站文件和最终压缩包的根目录，不允许为空。
+    root: ${APP_FILE_STORAGE_ROOT:./data/storage}
+
+  # mail 保存部署态邮件发送配置；未启用时发送接口会明确失败。
+  mail:
+    # enabled 指定是否启用真实 SMTP 发送，生产部署需要设置为 true。
+    enabled: ${MAIL_ENABLED:false}
+    # host 指定 SMTP 服务器地址，例如 smtp.qq.com、smtp.163.com 或企业邮箱 SMTP 地址。
+    host: ${MAIL_HOST:}
+    # port 指定 SMTP 端口，SSL 常用 465，STARTTLS 常用 587。
+    port: ${MAIL_PORT:465}
+    # username 指定 SMTP 登录账号，通常是发件邮箱。
+    username: ${MAIL_USERNAME:}
+    # password 指定 SMTP 授权码或密码，必须通过环境变量注入。
+    password: ${MAIL_PASSWORD:}
+    # from 指定邮件发件人地址，为空时默认使用 username。
+    from: ${MAIL_FROM:}
+    # ssl-enabled 指定是否启用 SSL 连接。
+    ssl-enabled: ${MAIL_SSL_ENABLED:true}
+    # starttls-enabled 指定是否启用 STARTTLS。
+    starttls-enabled: ${MAIL_STARTTLS_ENABLED:false}

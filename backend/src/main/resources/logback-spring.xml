@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- CONSOLE_PATTERN 控制控制台日志格式，不输出密码、Token、邮箱授权码等敏感字段。 -->
+    <property name="CONSOLE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+
+    <!-- 控制台输出用于本地开发和容器日志采集。 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 项目包默认 INFO 级别，避免调试日志泄露请求细节。 -->
+    <logger name="com.cooperation" level="${APP_LOG_LEVEL:-INFO}"/>
+
+    <!-- root 日志级别覆盖第三方框架默认输出。 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

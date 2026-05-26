@@ -1,0 +1,24 @@
+# spring.datasource 配置本地 MySQL 示例连接信息，真实密码必须从私有配置或环境变量注入。
+spring:
+  datasource:
+    # url 指定 MySQL JDBC 地址，host、port、database 可按本地环境调整。
+    url: jdbc:mysql://localhost:3306/cooperation?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    # username 指定业务数据库用户，禁止在生产环境使用 root。
+    username: cooperation_user
+    # password 仅为示例占位，实际值不得提交到仓库。
+    password: change_me
+
+# app 配置系统自定义示例参数。
+app:
+  file-storage:
+    # root 指定本地文件存储根目录，建议使用项目外可持久化目录。
+    root: ./data/storage
+  mail:
+    # provider 指定邮箱服务类型，可选值预留 qq、netease、platform-draft。
+    provider: platform-draft
+    # api-base-url 指定第三方邮箱 API 地址，不支持草稿箱 API 时可留空。
+    api-base-url: ""
+    # client-id 指定邮箱 API 客户端标识，示例文件中不得填写真实值。
+    client-id: ""
+    # client-secret 指定邮箱 API 客户端密钥，示例文件中不得填写真实值。
+    client-secret: ""
