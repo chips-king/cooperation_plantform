@@ -25,7 +25,12 @@ const elementPlusMock = vi.hoisted(() => ({
 vi.mock('@/services/packageApi', () => packageApiMock);
 
 vi.mock('vue-router', () => ({
+  RouterLink: {
+    props: ['to'],
+    template: '<a :href="String(to)"><slot /></a>',
+  },
   useRoute: () => ({ params: { projectId: 'p1' } }),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock('element-plus', () => ({

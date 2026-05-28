@@ -47,49 +47,70 @@
     <section class="group-page">
       <el-alert v-if="errorMessage" :title="errorMessage" type="warning" show-icon :closable="false" />
 
-      <section class="group-page__summary" aria-label="小组概览">
-        <el-card shadow="never">
-          <span>小组状态</span>
-          <strong>{{ group?.status === 'active' ? '正常' : group?.status || '未知' }}</strong>
-        </el-card>
-        <el-card shadow="never">
-          <span>项目数量</span>
-          <strong>{{ projects.length }}</strong>
-        </el-card>
-        <el-card shadow="never">
-          <span>当前成员视图</span>
-          <strong>{{ members.length }}</strong>
-        </el-card>
+      <!-- 小组头部 -->
+      <section class="group-page__header" aria-label="小组信息">
+        <div class="group-page__header-main">
+          <h1 class="group-page__header-name">{{ group?.name }}</h1>
+          <el-tag :type="group?.status === 'active' ? 'success' : 'info'" size="small" effect="plain">
+            {{ group?.status === 'active' ? '正常' : '停用' }}
+          </el-tag>
+        </div>
+        <div class="group-page__header-meta">
+          <span>{{ projects.length }} 个项目</span>
+          <span>{{ members.length }} 位成员</span>
+        </div>
       </section>
 
-      <el-card shadow="never">
-        <template #header>
-          <div class="group-page__card-header">
-            <span>小组项目</span>
-            <el-tag type="info">{{ projects.length }} 个</el-tag>
+      <!-- 项目列表：GitHub 仓库列表风格 -->
+      <section class="group-page__repos" aria-label="项目列表">
+        <div class="group-page__repos-header">
+          <span>项目</span>
+          <el-tag type="info" size="small">{{ projects.length }} 个</el-tag>
+        </div>
+
+        <div v-if="projects.length === 0" class="group-page__repos-empty">
+          <el-empty description="暂无项目">
+            <el-button type="primary" size="small" @click="router.push('/')">去创建项目</el-button>
+          </el-empty>
+        </div>
+
+        <div v-else class="group-page__repo-list">
+          <div
+            v-for="project in projects"
+            :key="project.id"
+            class="repo-row"
+            @click="router.push(`/projects/${project.id}`)"
+          >
+            <div class="repo-row__icon">
+              <FolderOpened />
+            </div>
+            <div class="repo-row__body">
+              <div class="repo-row__top">
+                <RouterLink
+                  :to="`/projects/${project.id}`"
+                  class="repo-row__name"
+                  @click.stop
+                >
+                  {{ project.name }}
+                </RouterLink>
+                <el-tag :type="project.status === 'active' ? 'success' : 'info'" size="small" effect="plain">
+                  {{ project.status === 'active' ? '协作中' : '已结束' }}
+                </el-tag>
+              </div>
+              <div class="repo-row__meta">
+                <span>项目编号 {{ project.id }}</span>
+                <span v-if="project.endedAt">结束于 {{ formatDate(project.endedAt) }}</span>
+                <span v-else>创建后未结束</span>
+              </div>
+            </div>
+            <div class="repo-row__action">
+              <el-button size="small" @click.stop="router.push(`/projects/${project.id}`)">进入工作台</el-button>
+            </div>
           </div>
-        </template>
+        </div>
+      </section>
 
-        <el-table v-loading="loading" :data="projects" empty-text="暂无项目" @row-click="selectProject">
-          <el-table-column prop="name" label="项目名称" min-width="180" />
-          <el-table-column label="状态" width="120">
-            <template #default="{ row }">
-              <el-tag :type="row.status === 'active' ? 'success' : 'info'">
-                {{ row.status === 'active' ? '协作中' : '已结束' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="结束时间" min-width="160">
-            <template #default="{ row }">{{ formatDate(row.endedAt) }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="130" fixed="right">
-            <template #default="{ row }">
-              <RouterLink class="group-page__link" :to="`/projects/${row.id}`">进入工作台</RouterLink>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
-
+      <!-- 成员列表 -->
       <el-card shadow="never">
         <template #header>
           <div class="group-page__card-header">
@@ -117,9 +138,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Refresh } from '@element-plus/icons-vue';
+import { FolderOpened, Refresh } from '@element-plus/icons-vue';
 
 import MainLayout from '@/layouts/MainLayout.vue';
 import { getGroup, listProjects } from '@/services/groupProjectApi';
@@ -129,6 +150,7 @@ import { useProjectStore } from '@/stores/project';
 import type { Group, Invitation, InvitationMode, MemberPermission, Project, RoleTemplate } from '@/types/project';
 
 const route = useRoute();
+const router = useRouter();
 const authStore = useAuthStore();
 const projectStore = useProjectStore();
 const group = ref<Group | null>(null);
@@ -156,31 +178,14 @@ const invitationModeOptions = [
 ];
 const groupId = computed(() => Number(route.params.groupId || route.params.id || projectStore.currentGroup?.id || 0));
 
-/**
- * 读取当前用户标识。
- *
- * @returns 当前用户标识，未登录时返回 undefined
- */
 function currentUserId(): number | undefined {
   return authStore.currentUser?.id;
 }
 
-/**
- * 格式化日期展示。
- *
- * @param value 日期字符串
- * @returns 本地化后的日期文本
- */
 function formatDate(value?: string | null): string {
   return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '暂无';
 }
 
-/**
- * 转换角色模板中文名称。
- *
- * @param roleTemplate 角色模板编码
- * @returns 角色中文名称
- */
 function roleTemplateName(roleTemplate: RoleTemplate): string {
   const names: Record<RoleTemplate, string> = {
     OWNER: '负责人',
@@ -191,9 +196,6 @@ function roleTemplateName(roleTemplate: RoleTemplate): string {
   return names[roleTemplate] ?? roleTemplate;
 }
 
-/**
- * 加载小组详情、项目列表和默认项目成员。
- */
 async function loadGroupDetail(): Promise<void> {
   if (!groupId.value) {
     errorMessage.value = '缺少小组标识，无法加载小组详情';
@@ -213,7 +215,6 @@ async function loadGroupDetail(): Promise<void> {
     projectStore.setCurrentGroup(groupDetail);
     projectStore.setProjects(projectPage.items);
 
-    // 首次进入小组时默认展示第一个项目的成员权限，避免成员区域空置。
     if (!selectedProjectId.value && projects.value.length > 0) {
       selectedProjectId.value = projects.value[0].id;
       invitationForm.projectId = projects.value[0].id;
@@ -227,9 +228,6 @@ async function loadGroupDetail(): Promise<void> {
   }
 }
 
-/**
- * 根据选中的项目加载成员权限列表。
- */
 async function loadMembers(): Promise<void> {
   if (!selectedProjectId.value) {
     members.value = [];
@@ -248,20 +246,6 @@ async function loadMembers(): Promise<void> {
   }
 }
 
-/**
- * 选中项目后同步成员和邀请目标。
- *
- * @param project 当前点击的项目
- */
-async function selectProject(project: Project): Promise<void> {
-  selectedProjectId.value = project.id;
-  invitationForm.projectId = project.id;
-  await loadMembers();
-}
-
-/**
- * 创建邀请链接或邀请码。
- */
 async function handleCreateInvitation(): Promise<void> {
   if (!groupId.value || !invitationForm.projectId) {
     errorMessage.value = '请先选择小组项目';
@@ -313,25 +297,122 @@ onMounted(loadGroupDetail);
   word-break: break-all;
 }
 
-.group-page__summary {
+/* ---- 小组头部 ---- */
+.group-page__header {
+  padding: 18px 20px;
+  background: var(--cb-bg-card);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius-md);
+}
+
+.group-page__header-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.group-page__header-name {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--cb-text-primary);
+}
+
+.group-page__header-meta {
+  display: flex;
+  gap: 16px;
+  color: var(--cb-text-secondary);
+  font-size: 13px;
+}
+
+/* ---- 项目列表（GitHub repo list 风格） ---- */
+.group-page__repos {
+  background: var(--cb-bg-card);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius-md);
+  overflow: hidden;
+}
+
+.group-page__repos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--cb-bg-page);
+  border-bottom: 1px solid var(--cb-border-light);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.group-page__repos-empty {
+  padding: 40px 0;
+}
+
+.group-page__repo-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.repo-row {
+  display: flex;
+  align-items: center;
   gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--cb-border-light);
+  cursor: pointer;
+  transition: background 0.1s;
 }
 
-.group-page__summary :deep(.el-card__body) {
-  display: grid;
-  gap: 8px;
+.repo-row:last-child {
+  border-bottom: none;
 }
 
-.group-page__summary span {
-  color: #687386;
+.repo-row:hover {
+  background: var(--cb-bg-page);
 }
 
-.group-page__summary strong {
-  font-size: 24px;
+.repo-row__icon {
+  color: #9e9eb8;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
+.repo-row__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.repo-row__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.repo-row__name {
+  color: var(--cb-color-primary);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.repo-row__name:hover {
+  text-decoration: underline;
+}
+
+.repo-row__meta {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--cb-text-muted);
+}
+
+.repo-row__action {
+  flex-shrink: 0;
+}
+
+/* ---- 成员卡片 ---- */
 .group-page__card-header {
   display: flex;
   align-items: center;
@@ -343,15 +424,20 @@ onMounted(loadGroupDetail);
   width: 220px;
 }
 
-.group-page__link {
-  color: #1d4f91;
-  font-weight: 600;
-  text-decoration: none;
-}
-
 @media (max-width: 768px) {
-  .group-page__summary {
-    grid-template-columns: 1fr;
+  .group-page__header-meta {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .repo-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .repo-row__action {
+    width: 100%;
+    text-align: right;
   }
 
   .group-page__card-header {

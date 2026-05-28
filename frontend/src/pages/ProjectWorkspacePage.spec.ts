@@ -8,7 +8,7 @@ import { request } from '@/services/http';
 import { getProject } from '@/services/groupProjectApi';
 import { listOperationLogs } from '@/services/activityApi';
 import { getLatestPackage } from '@/services/packageApi';
-import { createDirectory } from '@/services/fileApi';
+import { createDirectory, getDirectoryTree, uploadFile } from '@/services/fileApi';
 
 const routerPush = vi.fn();
 
@@ -25,13 +25,15 @@ vi.mock('@/services/http', () => ({ request: vi.fn() }));
 vi.mock('@/services/groupProjectApi', () => ({ getProject: vi.fn() }));
 vi.mock('@/services/activityApi', () => ({ listOperationLogs: vi.fn() }));
 vi.mock('@/services/packageApi', () => ({ getLatestPackage: vi.fn() }));
-vi.mock('@/services/fileApi', () => ({ createDirectory: vi.fn() }));
+vi.mock('@/services/fileApi', () => ({ createDirectory: vi.fn(), getDirectoryTree: vi.fn(), uploadFile: vi.fn() }));
 
 const mockedRequest = vi.mocked(request);
 const mockedGetProject = vi.mocked(getProject);
 const mockedListOperationLogs = vi.mocked(listOperationLogs);
 const mockedGetLatestPackage = vi.mocked(getLatestPackage);
+const mockedUploadFile = vi.mocked(uploadFile);
 const mockedCreateDirectory = vi.mocked(createDirectory);
+const mockedGetDirectoryTree = vi.mocked(getDirectoryTree);
 
 function mountProjectWorkspacePage() {
   return mount(ProjectWorkspacePage, {
@@ -42,6 +44,9 @@ function mountProjectWorkspacePage() {
         RouterLink: {
           props: ['to'],
           template: '<a :href="String(to)"><slot /></a>',
+        },
+        PackageCommandDialog: {
+          template: '<div />',
         },
       },
     },
@@ -64,17 +69,10 @@ describe('ProjectWorkspacePage', () => {
     });
     mockedListOperationLogs.mockResolvedValue({ logs: [] });
     mockedGetLatestPackage.mockRejectedValue(new Error('没有压缩包'));
-    mockedRequest.mockResolvedValue({
+    // 项目无目录时，目录树返回空列表（不再自动创建默认分工目录）
+    mockedGetDirectoryTree.mockResolvedValue({
       projectId: '1',
-      totalDirectoryCount: 1,
-      completedDirectoryCount: 0,
-      directories: [{
-        directoryId: 'dir-1',
-        name: '默认分工目录',
-        status: 'in_progress',
-        statusDisplayName: '进行中',
-        updatedAt: '2026-05-26T09:56:18',
-      }],
+      directories: [],
     });
     mockedCreateDirectory.mockResolvedValue({
       id: 'dir-2',
@@ -86,45 +84,84 @@ describe('ProjectWorkspacePage', () => {
     });
   });
 
-  it('只有默认目录时提示创建分工目录', async () => {
+  it('项目为空时显示空状态提示', async () => {
     const wrapper = mountProjectWorkspacePage();
 
     await flushPromises();
 
-    expect(wrapper.text()).toContain('建议先创建分工目录');
-    expect(wrapper.text()).toContain('创建分工目录');
+    expect(wrapper.text()).toContain('此项目还没有文件');
   });
 
-  it('点击目录进度行后进入文件管理并定位目录', async () => {
-    const wrapper = mountProjectWorkspacePage();
-
-    await flushPromises();
-    await wrapper.find('tbody tr').trigger('click');
-
-    expect(routerPush).toHaveBeenCalledWith({
-      name: 'project-files',
-      params: { projectId: '1' },
-      query: { directoryId: 'dir-1' },
-    });
-  });
-
-  it('创建分工目录后进入新目录文件管理页', async () => {
-    vi.spyOn(window, 'prompt').mockReturnValue('任务一');
-    const wrapper = mountProjectWorkspacePage();
-
-    await flushPromises();
-    await wrapper.findAll('button').find((button) => button.text().includes('创建分工目录'))?.trigger('click');
-    await flushPromises();
-
-    expect(mockedCreateDirectory).toHaveBeenCalledWith({
+  it('项目有目录时展示目录列表', async () => {
+    // 模拟有根目录和子目录的项目
+    mockedGetDirectoryTree.mockResolvedValue({
       projectId: '1',
-      parentDirectoryId: 'dir-1',
-      name: '任务一',
+      directories: [{
+        id: 'dir-1',
+        parentId: null,
+        name: 'root',
+        status: 'in_progress',
+        files: [],
+        children: [{
+          id: 'dir-2',
+          parentId: 'dir-1',
+          name: '任务一',
+          status: 'in_progress',
+          files: [],
+          children: [],
+        }],
+      }],
     });
-    expect(routerPush).toHaveBeenCalledWith({
-      name: 'project-files',
-      params: { projectId: '1' },
-      query: { directoryId: 'dir-2' },
+    const wrapper = mountProjectWorkspacePage();
+
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('任务一');
+    expect(wrapper.text()).not.toContain('此项目还没有文件');
+  });
+
+  it('上传文件时自动创建根目录，文件直接落入根目录', async () => {
+    // 创建根目录返回根目录
+    mockedCreateDirectory.mockResolvedValueOnce({
+      id: 'dir-root',
+      parentId: null,
+      name: 'root',
+      status: 'in_progress',
+      files: [],
+      children: [],
     });
+    mockedUploadFile.mockResolvedValue({
+      fileId: 'file-1',
+      name: 'test.txt',
+      size: 100,
+      mimeType: 'text/plain',
+      duplicatePolicy: null,
+      versionNo: 1,
+      status: 'active',
+      archive: false,
+      uploadedAt: '2026-05-27T10:00:00',
+    });
+
+    const wrapper = mountProjectWorkspacePage();
+    await flushPromises();
+
+    // 触发上传文件事件（模拟 FileListBlock 发出）
+    const fileListBlock = wrapper.findComponent({ name: 'FileListBlock' });
+    await fileListBlock.vm.$emit('upload-files', [new File(['hello'], 'test.txt', { type: 'text/plain' })]);
+    await flushPromises();
+
+    // 验证只创建了隐藏根目录（不创建额外子目录）
+    expect(mockedCreateDirectory).toHaveBeenCalledTimes(1);
+    expect(mockedCreateDirectory).toHaveBeenNthCalledWith(1, {
+      projectId: '1',
+      parentDirectoryId: '0',
+      name: 'root',
+    });
+    // 验证文件直接上传到根目录
+    expect(mockedUploadFile).toHaveBeenCalledTimes(1);
+    expect(mockedUploadFile).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: '1',
+      directoryId: 'dir-root',
+    }));
   });
 });

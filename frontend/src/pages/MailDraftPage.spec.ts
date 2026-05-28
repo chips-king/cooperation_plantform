@@ -13,6 +13,9 @@ const mailApiMock = vi.hoisted(() => ({
   createMailDraft: vi.fn(),
   sendMailDraft: vi.fn(),
   updateMailDraft: vi.fn(),
+  getMailDraft: vi.fn(),
+  listProjectDrafts: vi.fn(),
+  listUserDraftSummaries: vi.fn(),
 }));
 
 const packageApiMock = vi.hoisted(() => ({
@@ -29,8 +32,11 @@ const elementPlusMock = vi.hoisted(() => ({
 vi.mock('@/services/mailApi', () => mailApiMock);
 vi.mock('@/services/packageApi', () => packageApiMock);
 
+const routerPush = vi.fn();
+
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { projectId: 'p1' } }),
+  useRoute: () => ({ params: { projectId: 'p1' }, name: 'mail-draft' }),
+  useRouter: () => ({ push: routerPush }),
 }));
 
 vi.mock('element-plus', () => ({
@@ -171,6 +177,17 @@ function createElementStubs(): Record<string, ReturnType<typeof defineComponent>
     ElTag: defineComponent({
       template: '<span><slot /></span>',
     }),
+    ElBadge: defineComponent({
+      props: { value: { type: [Number, String], default: 0 } },
+      template: '<span><slot />{{ value }}</span>',
+    }),
+    ElEmpty: defineComponent({
+      props: { description: { type: String, default: '' } },
+      template: '<div>{{ description }}</div>',
+    }),
+    ElIcon: defineComponent({
+      template: '<i><slot /></i>',
+    }),
   };
 }
 
@@ -199,6 +216,17 @@ function mountPage() {
       plugins: [pinia],
       stubs: {
         RouterLink: RouterLinkStub,
+        MainLayout: defineComponent({
+          setup(_, { slots }) {
+            return () => h('div', [
+              slots.title?.(),
+              slots.actions?.(),
+              slots.aside?.(),
+              slots.default?.(),
+            ]);
+          },
+        }),
+        PackageCommandDialog: defineComponent({ template: '<div />' }),
         ...createElementStubs(),
       },
     },
@@ -232,6 +260,9 @@ async function fillDraftForm(wrapper: ReturnType<typeof mount>): Promise<void> {
 describe('MailDraftPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routerPush.mockResolvedValue(undefined);
+    mailApiMock.listProjectDrafts.mockResolvedValue([]);
+    mailApiMock.listUserDraftSummaries.mockResolvedValue([]);
     packageApiMock.getLatestPackage.mockResolvedValue({
       packageId: 'pkg-zip',
       filename: '课程项目成果.zip',

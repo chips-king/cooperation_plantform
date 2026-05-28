@@ -46,7 +46,7 @@
       </el-card>
 
       <el-card class="panel" shadow="never">
-        <el-table v-loading="loading" :data="logs" border>
+        <el-table v-loading="loading" :data="logs" border empty-text="暂无操作记录">
           <el-table-column label="时间" min-width="170" prop="createdAt" />
           <el-table-column label="操作人" min-width="100" prop="actorId" />
           <el-table-column label="类型" min-width="170">

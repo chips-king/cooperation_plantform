@@ -1,99 +1,109 @@
 <template>
   <MainLayout>
     <template #title>
-      <span>项目首页</span>
+      <span>我的协作空间</span>
     </template>
 
     <template #actions>
+      <el-input
+        v-model.trim="searchForm.projectKeyword"
+        placeholder="搜索项目、文件或成员"
+        :prefix-icon="Search"
+        size="default"
+        clearable
+        style="width: 260px"
+        @keyup.enter="runSearch"
+      />
       <el-button :icon="Plus" @click="openGroupDialog">新建小组</el-button>
       <el-button type="primary" :icon="Plus" @click="openProjectDialog">新建项目</el-button>
       <el-button :icon="Refresh" :loading="loading" @click="loadHomeData">刷新</el-button>
     </template>
 
     <template #aside>
-      <section class="home-page__aside">
-        <h2>小组筛选</h2>
-        <el-radio-group v-model="selectedGroupId" class="home-page__group-filter" @change="handleGroupChange">
-          <el-radio-button :value="null">全部</el-radio-button>
-          <el-radio-button v-for="group in projectStore.groups" :key="group.id" :value="group.id">
-            {{ group.name }}
-          </el-radio-button>
-        </el-radio-group>
-      </section>
+      <nav class="home-page__aside">
+        <div class="home-page__aside-label">最近项目</div>
+        <div v-if="recentProjects.length === 0" class="home-page__aside-empty">暂无项目</div>
+        <RouterLink
+          v-for="project in recentProjects"
+          :key="project.id"
+          class="home-page__project-link"
+          :to="`/projects/${project.id}`"
+        >
+          <span class="home-page__project-link-name">{{ project.name }}</span>
+          <el-tag
+            :type="project.status === 'active' ? 'success' : 'info'"
+            size="small"
+            effect="plain"
+          >
+            {{ project.status === 'active' ? '协作中' : '已结束' }}
+          </el-tag>
+        </RouterLink>
+      </nav>
     </template>
 
     <section class="home-page">
-      <el-card class="home-page__toolbar" shadow="never">
-        <el-form class="home-page__search" :inline="true" :model="searchForm" @submit.prevent="runSearch">
-          <el-form-item label="项目名">
-            <el-input v-model.trim="searchForm.projectKeyword" placeholder="搜索项目" clearable />
-          </el-form-item>
-          <el-form-item label="文件名">
-            <el-input v-model.trim="searchForm.fileKeyword" placeholder="搜索文件" clearable />
-          </el-form-item>
-          <el-form-item label="成员名">
-            <el-input v-model.trim="searchForm.memberKeyword" placeholder="搜索成员" clearable />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :icon="Search" :loading="searching" @click="runSearch">搜索</el-button>
-          </el-form-item>
-        </el-form>
-      </el-card>
+      <el-alert v-if="errorMessage" :title="errorMessage" type="warning" show-icon :closable="false" />
 
-      <el-alert
-        v-if="errorMessage"
-        :title="errorMessage"
-        type="warning"
-        show-icon
-        :closable="false"
-      />
-
-      <section class="home-page__summary" aria-label="项目概览">
-        <el-card class="home-page__metric" shadow="never">
-          <span>最近项目</span>
-          <strong>{{ projectStore.projects.length }}</strong>
-        </el-card>
-        <el-card class="home-page__metric" shadow="never">
-          <span>协作中</span>
-          <strong>{{ activeCount }}</strong>
-        </el-card>
-        <el-card class="home-page__metric" shadow="never">
-          <span>已结束</span>
-          <strong>{{ endedCount }}</strong>
-        </el-card>
+      <section v-if="loading" class="home-page__loading">
+        <el-skeleton :rows="4" animated />
       </section>
 
-      <el-card class="home-page__list" shadow="never">
-        <template #header>
-          <div class="home-page__card-header">
-            <span>最近参与项目</span>
-            <el-tag type="info">{{ projectStore.projects.length }} 个</el-tag>
+      <template v-else>
+        <!-- 状态筛选导航栏 -->
+        <div class="home-page__status-nav">
+          <div
+            v-for="tab in statusTabs"
+            :key="tab.key"
+            class="home-page__status-tab"
+            :class="{ 'home-page__status-tab--active': activeStatus === tab.key }"
+            @click="activeStatus = tab.key"
+          >
+            <span class="home-page__status-tab-label">{{ tab.label }}</span>
+            <span class="home-page__status-tab-count">{{ tab.count }}</span>
           </div>
-        </template>
+        </div>
 
-        <el-table v-loading="loading" :data="projectRows" empty-text="暂无项目">
-          <el-table-column prop="name" label="项目名称" min-width="180" />
-          <el-table-column prop="groupName" label="所属小组" min-width="160" />
-          <el-table-column label="状态" width="120">
-            <template #default="{ row }">
-              <el-tag :type="row.status === 'active' ? 'success' : 'info'">
-                {{ row.status === 'active' ? '协作中' : '已结束' }}
-              </el-tag>
+        <!-- 项目卡片列表 -->
+        <div v-if="filteredProjects.length === 0" class="home-page__empty">
+          <el-empty description="暂无项目">
+            <template #description>
+              <p style="margin: 8px 0; color: var(--cb-text-secondary)">暂无{{ statusTabs.find(t => t.key === activeStatus)?.label }}项目</p>
             </template>
-          </el-table-column>
-          <el-table-column label="最近更新" min-width="160">
-            <template #default="{ row }">
-              {{ formatDate(row.updatedAt || row.reopenedAt || row.endedAt) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="130" fixed="right">
-            <template #default="{ row }">
-              <RouterLink class="home-page__link" :to="`/projects/${row.id}`">进入工作台</RouterLink>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
+            <el-button type="primary" :icon="Plus" @click="openProjectDialog">创建项目</el-button>
+          </el-empty>
+        </div>
 
+        <div v-else class="home-page__project-grid">
+          <div
+            v-for="project in filteredProjects"
+            :key="project.id"
+            class="home-page__project-card"
+          >
+            <RouterLink class="home-page__project-card-link" :to="`/projects/${project.id}`"
+            >
+              <div class="home-page__project-card-header">
+                <FolderOpened class="home-page__project-card-icon" />
+                <span class="home-page__project-card-name">{{ project.name }}</span>
+              </div>
+              <div class="home-page__project-card-footer">
+                <el-tag :type="project.status === 'active' ? 'success' : 'info'" size="small" effect="plain">
+                  {{ project.status === 'active' ? '协作中' : '已结束' }}
+                </el-tag>
+                <span class="home-page__project-card-group">{{ getGroupName(project.groupId) }}</span>
+              </div>
+            </RouterLink>
+            <button
+              class="home-page__project-delete"
+              title="删除项目"
+              @click.stop="confirmDeleteProject(project)"
+            >
+              <Delete class="home-page__project-delete-icon" />
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- 搜索结果 -->
       <el-card v-if="hasSearchResult" class="home-page__search-result" shadow="never">
         <template #header>
           <span>搜索结果</span>
@@ -121,6 +131,7 @@
         </el-tabs>
       </el-card>
 
+      <!-- 新建小组弹窗 -->
       <el-dialog v-model="groupDialogVisible" title="新建小组" width="420px">
         <el-form label-position="top" @submit.prevent>
           <el-form-item label="小组名称" required>
@@ -133,6 +144,7 @@
         </template>
       </el-dialog>
 
+      <!-- 新建项目弹窗 -->
       <el-dialog v-model="projectDialogVisible" title="新建项目" width="460px">
         <el-form label-position="top" @submit.prevent>
           <el-form-item label="所属小组" required>
@@ -160,13 +172,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { ElMessage } from 'element-plus';
-import { Plus, Refresh, Search } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Delete, FolderOpened, Plus, Refresh, Search } from '@element-plus/icons-vue';
 
 import MainLayout from '@/layouts/MainLayout.vue';
 import {
   createGroup,
   createProject,
+  deleteGroup,
+  deleteProject,
   listGroups,
   listProjects,
   searchFiles,
@@ -177,10 +191,13 @@ import { useAuthStore } from '@/stores/auth';
 import { useProjectStore } from '@/stores/project';
 import type { FileHit, Group, MemberHit, Project, ProjectHit, SearchResult } from '@/types/project';
 
-type ProjectRow = Project & {
-  groupName: string;
-  updatedAt?: string;
-};
+type StatusFilter = 'all' | 'active' | 'ended';
+
+interface StatusTab {
+  key: StatusFilter;
+  label: string;
+  count: number;
+}
 
 const authStore = useAuthStore();
 const projectStore = useProjectStore();
@@ -191,15 +208,12 @@ const creatingProject = ref(false);
 const groupDialogVisible = ref(false);
 const projectDialogVisible = ref(false);
 const errorMessage = ref('');
-const selectedGroupId = ref<number | null>(projectStore.filters.groupId);
+const activeStatus = ref<StatusFilter>('all');
+
 const searchForm = reactive({
   projectKeyword: '',
-  fileKeyword: '',
-  memberKeyword: '',
 });
-const groupForm = reactive({
-  name: '',
-});
+const groupForm = reactive({ name: '' });
 const projectForm = reactive<{
   groupId: number | null;
   name: string;
@@ -217,96 +231,58 @@ const searchResults = reactive<{
   members: [],
 });
 
-const activeCount = computed(() => projectStore.projects.filter((project) => project.status === 'active').length);
-const endedCount = computed(() => projectStore.projects.filter((project) => project.status === 'ended').length);
+const statusTabs = computed<StatusTab[]>(() => {
+  const all = projectStore.projects.length;
+  const active = projectStore.projects.filter((p) => p.status === 'active').length;
+  const ended = all - active;
+  return [
+    { key: 'all', label: '全部', count: all },
+    { key: 'active', label: '协作中', count: active },
+    { key: 'ended', label: '已结束', count: ended },
+  ];
+});
+
+const filteredProjects = computed(() => {
+  if (activeStatus.value === 'all') return projectStore.projects;
+  return projectStore.projects.filter((p) => p.status === activeStatus.value);
+});
+
+const recentProjects = computed(() => projectStore.projects.slice(0, 6));
+
 const hasSearchResult = computed(
   () => searchResults.projects.length > 0 || searchResults.files.length > 0 || searchResults.members.length > 0,
 );
-const projectRows = computed<ProjectRow[]>(() => {
-  const groupNameMap = new Map<number, string>(projectStore.groups.map((group) => [group.id, group.name]));
 
-  return projectStore.projects.map((project) => ({
-    ...project,
-    groupName: groupNameMap.get(project.groupId) ?? `小组 ${project.groupId}`,
-  }));
-});
-
-/**
- * 统一读取当前用户标识，供测试期 X-User-Id 请求头复用。
- *
- * @returns 当前用户标识，未登录时返回 undefined
- */
 function currentUserId(): number | undefined {
   return authStore.currentUser?.id;
 }
 
-/**
- * 格式化列表中的日期展示。
- *
- * @param value 日期字符串
- * @returns 本地化后的日期文本
- */
-function formatDate(value?: string | null): string {
-  if (!value) {
-    return '暂无记录';
-  }
-
-  return new Date(value).toLocaleString('zh-CN', { hour12: false });
+function getGroupName(groupId: number): string {
+  return projectStore.groups.find((g) => g.id === groupId)?.name ?? '未知小组';
 }
 
-/**
- * 解析搜索接口可能返回的统一搜索结构或命中数组。
- *
- * @param result 搜索接口响应
- * @param key 需要读取的结果字段
- * @returns 命中项数组
- */
-function normalizeSearchResult<T extends ProjectHit | FileHit | MemberHit>(
-  result: SearchResult | T[],
-  key: keyof SearchResult,
-): T[] {
-  // 后端可返回统一结构，也可按单类搜索直接返回数组，页面在边界处做兼容。
-  if (Array.isArray(result)) {
-    return result;
-  }
-
-  return result[key] as T[];
-}
-
-/**
- * 打开小组创建弹窗并重置表单。
- */
 function openGroupDialog(): void {
   groupForm.name = '';
   groupDialogVisible.value = true;
 }
 
-/**
- * 打开项目创建弹窗，默认选中当前筛选小组或列表首个小组。
- */
 function openProjectDialog(): void {
   if (projectStore.groups.length === 0) {
     ElMessage.warning('请先创建小组，再创建项目');
     return;
   }
-
-  projectForm.groupId = selectedGroupId.value ?? projectStore.groups[0].id;
+  projectForm.groupId = projectStore.groups[0]?.id ?? null;
   projectForm.name = '';
   projectDialogVisible.value = true;
 }
 
-/**
- * 提交小组创建请求并刷新首页数据。
- */
 async function submitGroup(): Promise<void> {
   if (!groupForm.name) {
     ElMessage.warning('请输入小组名称');
     return;
   }
-
   creatingGroup.value = true;
   errorMessage.value = '';
-
   try {
     await createGroup({ name: groupForm.name, userId: currentUserId() });
     ElMessage.success('小组创建成功');
@@ -319,9 +295,6 @@ async function submitGroup(): Promise<void> {
   }
 }
 
-/**
- * 提交项目创建请求并刷新首页数据。
- */
 async function submitProject(): Promise<void> {
   if (!projectForm.groupId) {
     ElMessage.warning('请选择所属小组');
@@ -331,16 +304,12 @@ async function submitProject(): Promise<void> {
     ElMessage.warning('请输入项目名称');
     return;
   }
-
   creatingProject.value = true;
   errorMessage.value = '';
-
   try {
     await createProject({ groupId: projectForm.groupId, name: projectForm.name, userId: currentUserId() });
     ElMessage.success('项目创建成功');
     projectDialogVisible.value = false;
-    selectedGroupId.value = projectForm.groupId;
-    projectStore.setFilters({ groupId: projectForm.groupId });
     await loadHomeData();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '项目创建失败';
@@ -349,25 +318,13 @@ async function submitProject(): Promise<void> {
   }
 }
 
-/**
- * 加载首页小组和最近参与项目。
- */
 async function loadHomeData(): Promise<void> {
   loading.value = true;
   errorMessage.value = '';
-
   try {
     const [groupPage, projectPage] = await Promise.all([
       listGroups({ page: 1, size: 50 }, { userId: currentUserId() }),
-      listProjects(
-        {
-          page: 1,
-          size: 20,
-          groupId: selectedGroupId.value ?? undefined,
-          keyword: projectStore.filters.keyword || undefined,
-        },
-        { userId: currentUserId() },
-      ),
+      listProjects({ page: 1, size: 20 }, { userId: currentUserId() }),
     ]);
     projectStore.setGroups(groupPage.items as Group[]);
     projectStore.setProjects(projectPage.items as Project[]);
@@ -378,37 +335,25 @@ async function loadHomeData(): Promise<void> {
   }
 }
 
-/**
- * 切换小组筛选后刷新项目列表。
- */
-async function handleGroupChange(): Promise<void> {
-  projectStore.setFilters({ groupId: selectedGroupId.value });
-  await loadHomeData();
-}
-
-/**
- * 执行项目、文件和成员基础搜索。
- */
 async function runSearch(): Promise<void> {
   searching.value = true;
   errorMessage.value = '';
   projectStore.setFilters({ keyword: searchForm.projectKeyword });
-
   try {
     const [projects, files, members] = await Promise.all([
       searchForm.projectKeyword
         ? searchProjects({ keyword: searchForm.projectKeyword, userId: currentUserId() })
         : Promise.resolve([] as ProjectHit[]),
-      searchForm.fileKeyword
-        ? searchFiles({ keyword: searchForm.fileKeyword, userId: currentUserId() })
+      searchForm.projectKeyword
+        ? searchFiles({ keyword: searchForm.projectKeyword, userId: currentUserId() })
         : Promise.resolve([] as FileHit[]),
-      searchForm.memberKeyword
-        ? searchMembers({ keyword: searchForm.memberKeyword, userId: currentUserId() })
+      searchForm.projectKeyword
+        ? searchMembers({ keyword: searchForm.projectKeyword, userId: currentUserId() })
         : Promise.resolve([] as MemberHit[]),
     ]);
-    searchResults.projects = normalizeSearchResult(projects, 'projects');
-    searchResults.files = normalizeSearchResult(files, 'files');
-    searchResults.members = normalizeSearchResult(members, 'members');
+    searchResults.projects = Array.isArray(projects) ? projects : (projects as SearchResult).projects ?? [];
+    searchResults.files = Array.isArray(files) ? files : (files as SearchResult).files ?? [];
+    searchResults.members = Array.isArray(members) ? members : (members as SearchResult).members ?? [];
     await loadHomeData();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '搜索失败，请稍后重试';
@@ -417,72 +362,231 @@ async function runSearch(): Promise<void> {
   }
 }
 
+async function confirmDeleteProject(project: Project): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除项目「${project.name}」吗？删除后不可恢复。`,
+      '删除项目',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger',
+      },
+    );
+    await deleteProject(project.id);
+    ElMessage.success('项目已删除');
+    await loadHomeData();
+  } catch (error) {
+    if (error === 'cancel' || (error as Error)?.message === 'cancel') return;
+    errorMessage.value = error instanceof Error ? error.message : '删除项目失败';
+  }
+}
+
 onMounted(loadHomeData);
 </script>
 
 <style scoped>
-.home-page {
-  display: grid;
-  gap: 18px;
+.home-page { display: grid; gap: 20px; }
+
+/* ---- 侧边栏 ---- */
+.home-page__aside-label {
+  padding: 0 0 8px;
+  color: #6b6b8a; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.8px;
 }
 
-.home-page__aside h2 {
-  margin: 0 0 12px;
-  font-size: 14px;
+.home-page__aside-empty {
+  padding: 12px 0;
+  color: #9e9eb8;
+  font-size: 13px;
 }
 
-.home-page__group-filter {
-  display: grid;
-  gap: 8px;
-}
-
-.home-page__toolbar,
-.home-page__list,
-.home-page__search-result,
-.home-page__metric {
-  border-radius: 8px;
-}
-
-.home-page__search {
+.home-page__project-link {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+  color: #9e9eb8;
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.1s, color 0.1s;
 }
 
-.home-page__summary {
+.home-page__project-link:hover {
+  color: #e8e8f0;
+  background: rgba(255,255,255,0.06);
+}
+
+.home-page__project-link-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 加载和空态 ---- */
+.home-page__loading { padding: 40px 0; }
+.home-page__empty { padding: 60px 0; text-align: center; color: var(--cb-text-muted); }
+
+/* ---- 状态筛选导航栏 ---- */
+.home-page__status-nav {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--cb-bg-card);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius-md);
+}
+
+.home-page__status-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex: 1;
+  justify-content: center;
+}
+
+.home-page__status-tab:hover {
+  background: var(--cb-bg-page);
+}
+
+.home-page__status-tab--active {
+  background: var(--cb-color-primary);
+  color: #fff;
+}
+
+.home-page__status-tab-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.home-page__status-tab-count {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.06);
+}
+
+.home-page__status-tab--active .home-page__status-tab-count {
+  background: rgba(255,255,255,0.2);
+}
+
+/* ---- 项目卡片网格 ---- */
+.home-page__project-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px;
 }
 
-.home-page__metric :deep(.el-card__body) {
-  display: grid;
-  gap: 8px;
+.home-page__project-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: var(--cb-bg-card);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius-md);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
-.home-page__metric span {
-  color: #687386;
+.home-page__project-card:hover {
+  border-color: var(--cb-color-primary);
+  box-shadow: var(--cb-shadow-elevated);
+  transform: translateY(-2px);
 }
 
-.home-page__metric strong {
-  font-size: 28px;
-  line-height: 1;
+.home-page__project-card-link {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-decoration: none;
+  color: inherit;
 }
 
-.home-page__card-header {
+.home-page__project-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-page__project-card-icon {
+  width: 20px;
+  height: 20px;
+  color: #5470c6;
+  flex-shrink: 0;
+}
+
+.home-page__project-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cb-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-page__project-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.home-page__link {
-  color: #1d4f91;
-  font-weight: 600;
-  text-decoration: none;
+.home-page__project-card-group {
+  font-size: 12px;
+  color: var(--cb-text-muted);
+}
+
+.home-page__project-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.home-page__project-card:hover .home-page__project-delete {
+  opacity: 1;
+}
+
+.home-page__project-delete:hover {
+  background: #fde2e2;
+  color: #f56c6c;
+}
+
+.home-page__project-delete-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- 搜索结果 ---- */
+.home-page__search-result {
+  margin-top: 8px;
 }
 
 @media (max-width: 768px) {
-  .home-page__summary {
+  .home-page__status-nav {
+    flex-direction: column;
+  }
+
+  .home-page__project-grid {
     grid-template-columns: 1fr;
   }
 }

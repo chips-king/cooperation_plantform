@@ -1,7 +1,7 @@
 <template>
   <MainLayout>
     <template #title>
-      <span>目录进度</span>
+      <span>任务进度</span>
     </template>
 
     <template #actions>
@@ -17,47 +17,73 @@
         title="未识别到当前项目，请从项目工作台进入进度页面。"
       />
 
-      <div class="progress-page__summary">
-        <div>
-          <h2>按目录维护协作状态</h2>
-          <p>目录状态用于协作提示，不会锁定文件上传或修改。</p>
-        </div>
-        <el-progress
-          type="dashboard"
-          :percentage="completedPercentage"
-          :width="116"
-          :stroke-width="10"
-        />
-      </div>
-
-      <el-table v-loading="loading" :data="directories" empty-text="暂无目录进度">
-        <el-table-column prop="name" label="目录" min-width="180" show-overflow-tooltip />
-        <el-table-column label="当前状态" width="130">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)">
-              {{ row.statusDisplayName || statusText(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="切换状态" min-width="240">
-          <template #default="{ row }">
-            <el-radio-group
-              :model-value="row.status"
-              :disabled="updatingDirectoryId === row.directoryId"
-              @change="handleStatusRadioChange(row.directoryId, $event)"
+      <div class="kanban">
+        <div class="kanban-column">
+          <div class="kanban-header kanban-header--not-started">
+            <span>未开始</span>
+            <el-tag type="info" size="small">{{ notStartedDirs.length }}</el-tag>
+          </div>
+          <div class="kanban-cards">
+            <div
+              v-for="dir in notStartedDirs"
+              :key="dir.directoryId"
+              class="kanban-card"
             >
-              <el-radio-button label="未开始" value="not_started">未开始</el-radio-button>
-              <el-radio-button label="进行中" value="in_progress">进行中</el-radio-button>
-              <el-radio-button label="已完成" value="completed">已完成</el-radio-button>
-            </el-radio-group>
-          </template>
-        </el-table-column>
-        <el-table-column label="最近更新" width="180">
-          <template #default="{ row }">
-            {{ formatDateTime(row.updatedAt) }}
-          </template>
-        </el-table-column>
-      </el-table>
+              <div class="kanban-card__name">{{ dir.name }}</div>
+              <div class="kanban-card__meta">
+                <span class="kanban-card__files">{{ dir.fileCount }} 个文件</span>
+                <span class="kanban-card__time">{{ formatDateTime(dir.updatedAt) }}</span>
+              </div>
+            </div>
+            <el-empty v-if="notStartedDirs.length === 0" description="暂无" :image-size="64" />
+          </div>
+        </div>
+
+        <div class="kanban-column">
+          <div class="kanban-header kanban-header--in-progress">
+            <span>进行中</span>
+            <el-tag type="warning" size="small">{{ inProgressDirs.length }}</el-tag>
+          </div>
+          <div class="kanban-cards">
+            <div
+              v-for="dir in inProgressDirs"
+              :key="dir.directoryId"
+              class="kanban-card"
+            >
+              <div class="kanban-card__name">{{ dir.name }}</div>
+              <div class="kanban-card__meta">
+                <span class="kanban-card__files">{{ dir.fileCount }} 个文件</span>
+                <span class="kanban-card__time">{{ formatDateTime(dir.updatedAt) }}</span>
+              </div>
+            </div>
+            <el-empty v-if="inProgressDirs.length === 0" description="暂无" :image-size="64" />
+          </div>
+        </div>
+
+        <div class="kanban-column">
+          <div class="kanban-header kanban-header--completed">
+            <span>已完成</span>
+            <el-tag type="success" size="small">{{ completedDirs.length }}</el-tag>
+          </div>
+          <div class="kanban-cards">
+            <div
+              v-for="dir in completedDirs"
+              :key="dir.directoryId"
+              class="kanban-card kanban-card--completed"
+            >
+              <div class="kanban-card__name">{{ dir.name }}</div>
+              <div class="kanban-card__meta">
+                <span class="kanban-card__files">{{ dir.fileCount }} 个文件</span>
+                <span class="kanban-card__time">{{ formatDateTime(dir.updatedAt) }}</span>
+              </div>
+              <el-tag v-if="dir.mailSent" type="success" size="small" class="kanban-card__badge">
+                已发邮件
+              </el-tag>
+            </div>
+            <el-empty v-if="completedDirs.length === 0" description="暂无" :image-size="64" />
+          </div>
+        </div>
+      </div>
     </section>
   </MainLayout>
 </template>
@@ -69,7 +95,7 @@ import { ElMessage } from 'element-plus';
 import { Refresh } from '@element-plus/icons-vue';
 
 import MainLayout from '@/layouts/MainLayout.vue';
-import { getProjectProgress, updateDirectoryStatus } from '@/services/fileApi';
+import { getProjectProgress } from '@/services/fileApi';
 import { useProjectStore } from '@/stores/project';
 
 import type { DirectoryProgress, DirectoryStatus } from '@/types/project';
@@ -79,22 +105,35 @@ const projectStore = useProjectStore();
 
 const loading = ref(false);
 const directories = ref<DirectoryProgress[]>([]);
-const totalDirectoryCount = ref(0);
-const completedDirectoryCount = ref(0);
-const updatingDirectoryId = ref('');
 
 const projectId = computed(() => {
   const routeProjectId = route.params.projectId;
   return String(Array.isArray(routeProjectId) ? routeProjectId[0] : routeProjectId || projectStore.currentProject?.id || '');
 });
 
-const completedPercentage = computed(() => {
-  if (!totalDirectoryCount.value) {
-    return 0;
-  }
+/**
+ * 根据文件数量和邮件发送状态自动判断目录进度状态。
+ *
+ * @param dir 目录进度数据
+ * @returns 自动推断后的状态
+ */
+function autoStatus(dir: DirectoryProgress): DirectoryStatus {
+  if (dir.mailSent) return 'completed';
+  if (dir.fileCount === 0) return 'not_started';
+  return 'in_progress';
+}
 
-  return Math.round((completedDirectoryCount.value / totalDirectoryCount.value) * 100);
-});
+const notStartedDirs = computed(() =>
+  directories.value.filter((dir) => autoStatus(dir) === 'not_started'),
+);
+
+const inProgressDirs = computed(() =>
+  directories.value.filter((dir) => autoStatus(dir) === 'in_progress'),
+);
+
+const completedDirs = computed(() =>
+  directories.value.filter((dir) => autoStatus(dir) === 'completed'),
+);
 
 onMounted(() => {
   void loadProgress();
@@ -106,8 +145,6 @@ onMounted(() => {
 async function loadProgress(): Promise<void> {
   if (!projectId.value) {
     directories.value = [];
-    totalDirectoryCount.value = 0;
-    completedDirectoryCount.value = 0;
     return;
   }
 
@@ -116,96 +153,11 @@ async function loadProgress(): Promise<void> {
   try {
     const response = await getProjectProgress(projectId.value);
     directories.value = response.directories;
-    totalDirectoryCount.value = response.totalDirectoryCount;
-    completedDirectoryCount.value = response.completedDirectoryCount;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '目录进度加载失败');
   } finally {
     loading.value = false;
   }
-}
-
-/**
- * 更新目录状态并同步页面行数据。
- *
- * @param directoryId 目录标识
- * @param status 目标状态
- */
-async function handleStatusChange(directoryId: string, status: DirectoryStatus): Promise<void> {
-  updatingDirectoryId.value = directoryId;
-
-  try {
-    const response = await updateDirectoryStatus({
-      projectId: projectId.value,
-      directoryId,
-      status,
-    });
-
-    // 局部更新后重新计算完成数量，避免一次状态切换触发整页刷新。
-    directories.value = directories.value.map((directory) => {
-      if (directory.directoryId !== directoryId) {
-        return directory;
-      }
-
-      return {
-        ...directory,
-        status: response.status,
-        statusDisplayName: response.statusDisplayName,
-        updatedAt: new Date().toISOString(),
-      };
-    });
-    completedDirectoryCount.value = directories.value.filter((directory) => directory.status === 'completed').length;
-    totalDirectoryCount.value = directories.value.length;
-    ElMessage.success('目录状态已更新');
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '目录状态更新失败');
-  } finally {
-    updatingDirectoryId.value = '';
-  }
-}
-
-/**
- * 接收 Element Plus 单选组事件并收窄为目录状态。
- *
- * @param directoryId 目录标识
- * @param value 单选组事件值
- */
-function handleStatusRadioChange(directoryId: string, value: string | number | boolean | undefined): void {
-  if (value === 'not_started' || value === 'in_progress' || value === 'completed') {
-    void handleStatusChange(directoryId, value);
-  }
-}
-
-/**
- * 获取状态标签样式。
- *
- * @param status 目录状态
- * @returns Element Plus 标签类型
- */
-function statusTagType(status: DirectoryStatus): 'info' | 'warning' | 'success' {
-  const tagTypes: Record<DirectoryStatus, 'info' | 'warning' | 'success'> = {
-    not_started: 'info',
-    in_progress: 'warning',
-    completed: 'success',
-  };
-
-  return tagTypes[status];
-}
-
-/**
- * 转换目录状态中文文案。
- *
- * @param status 目录状态
- * @returns 中文状态文案
- */
-function statusText(status: DirectoryStatus): string {
-  const statusMap: Record<DirectoryStatus, string> = {
-    not_started: '未开始',
-    in_progress: '进行中',
-    completed: '已完成',
-  };
-
-  return statusMap[status];
 }
 
 /**
@@ -229,31 +181,97 @@ function formatDateTime(value: string): string {
   gap: 18px;
 }
 
-.progress-page__summary {
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f5f7fa;
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 300px;
+}
+
+.kanban-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 20px;
+  font-size: 15px;
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 2px solid;
+}
+
+.kanban-header--not-started {
+  color: #606266;
+  border-color: #909399;
+}
+
+.kanban-header--in-progress {
+  color: #e6a23c;
+  border-color: #e6a23c;
+}
+
+.kanban-header--completed {
+  color: #67c23a;
+  border-color: #67c23a;
+}
+
+.kanban-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.kanban-card {
+  background: #ffffff;
   border: 1px solid #e4e7ed;
   border-radius: 8px;
-  background: #ffffff;
+  padding: 14px;
+  transition: box-shadow 0.15s ease;
 }
 
-.progress-page__summary h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
+.kanban-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.progress-page__summary p {
-  margin: 0;
-  color: #687386;
+.kanban-card--completed {
+  border-color: #b3e19d;
+  background: #f6fff2;
 }
 
-@media (max-width: 720px) {
-  .progress-page__summary {
-    align-items: flex-start;
-    flex-direction: column;
+.kanban-card__name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.kanban-card__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #909399;
+}
+
+.kanban-card__files {
+  color: #606266;
+}
+
+.kanban-card__badge {
+  margin-top: 8px;
+}
+
+@media (max-width: 960px) {
+  .kanban {
+    grid-template-columns: 1fr;
   }
 }
 </style>

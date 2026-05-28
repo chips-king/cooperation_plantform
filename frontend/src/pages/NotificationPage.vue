@@ -11,14 +11,7 @@
     </template>
 
     <template #aside>
-      <el-descriptions :column="1" size="small" border>
-        <el-descriptions-item label="未读">
-          {{ unreadCount }}
-        </el-descriptions-item>
-        <el-descriptions-item label="总数">
-          {{ notifications.length }}
-        </el-descriptions-item>
-      </el-descriptions>
+      <div />
     </template>
 
     <section class="notification-page">
@@ -35,7 +28,7 @@
       </el-card>
 
       <el-card class="panel" shadow="never">
-        <el-table v-loading="loading" :data="notifications" border>
+        <el-table v-loading="loading" :data="notifications" border empty-text="暂无通知">
           <el-table-column label="状态" min-width="90">
             <template #default="{ row }: { row: Notification }">
               <el-tag :type="row.readAt ? 'info' : 'danger'">
