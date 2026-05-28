@@ -515,6 +515,16 @@ project.reopen
 
 ## 7. 页面规划
 
+页面导航规则：
+
+- 首页（/）是顶层页面，不提供返回入口。
+- 每个子页面应在标题左侧提供返回箭头。
+- 返回优先级：浏览器历史回退 > 按路由层级跳转。
+- 项目子页面（文件管理、任务进度、打包检查、打包导出、邮件草稿、操作记录）返回目标为项目工作台。
+- 项目工作台返回目标为首页。
+- 小组详情页返回目标为首页。
+- 通知中心返回目标为首页。
+
 ### 7.1 首页
 
 核心内容：
@@ -647,6 +657,7 @@ GET    /groups
 POST   /groups
 GET    /groups/{groupId}
 PATCH  /groups/{groupId}
+DELETE /groups/{groupId}
 
 GET    /projects
 POST   /groups/{groupId}/projects
@@ -656,7 +667,7 @@ POST   /projects/{projectId}/end
 POST   /projects/{projectId}/reopen
 ```
 
-追踪：S4, S16。
+追踪：S3, S4, S16。
 
 ### 8.2 成员与邀请
 
@@ -700,6 +711,7 @@ DELETE /files/{fileId}
 
 GET    /projects/{projectId}/trash
 POST   /files/{fileId}/restore
+DELETE /projects/{projectId}/trash
 ```
 
 追踪：S7, S8, S9。
@@ -767,6 +779,7 @@ GET    /search/members
 | 用例 | 输入或输出字段 | 说明 | 追踪 |
 |---|---|---|---|
 | 恢复文件 | restore_directory_id | 原目录不存在时由用户选择的新恢复目录，恢复成功后写回文件所属目录 | S9 |
+| 清空回收站 | deleted_count | 成功删除的文件数量，用于前端清理后反馈 | S9 |
 | 打包检查 | can_continue_packaging | 检查结果是否允许继续打包；第一版检查只提醒不阻断，通常为 true | S11 |
 | 清理建议预览 | preview_objects | 清理前预览对象列表，预览阶段不得修改文件状态 | S12 |
 | 生成压缩包 | snapshot_created_at | 文件树快照时间，压缩请求、结果和记录保持一致 | S13, S15 |
@@ -1345,5 +1358,42 @@ PROJECT_REOPENED
 13. 首页、搜索与筛选。
 14. 验收测试。
 
-最后生成时间：2026-05-24 22:12:36
+最后生成时间：2026-05-26 15:03:52
+
+## 19. 小组删除实现说明
+
+### 19.1 小组删除规则
+
+- 只有小组负责人可以删除小组。
+- 小组内存在项目时不允许删除。
+- 删除小组时级联删除该小组的成员关系。
+- 删除操作需要记录。
+
+### 19.2 相关接口
+
+```text
+DELETE /groups/{groupId}
+```
+
+请求头：`X-User-Id` 当前操作人标识。
+
+响应：
+```json
+{
+  "deletedGroupId": 123
+}
+```
+
+### 19.3 实现步骤
+
+1. GroupRepository 新增 `deleteById` 方法。
+2. MembershipRepository 新增 `deleteByGroupId` 方法。
+3. 创建 `DeleteGroupUseCase`：
+   - 校验操作人为小组负责人。
+   - 校验小组内项目数量为 0。
+   - 删除成员关系。
+   - 删除小组。
+   - 写入操作记录。
+4. GroupController 新增 `DELETE /groups/{groupId}`。
+5. 前端新增 `deleteGroup` API 和删除按钮。
 

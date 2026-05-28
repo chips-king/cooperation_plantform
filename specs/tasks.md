@@ -1333,6 +1333,32 @@
 - 内容：实现顶部导航、侧边栏插槽、内容区和通知入口。
 - 验收：不包含业务请求。
 
+### Phase 3 / A044 [P] 实现删除小组用例
+
+- 标记：[P]
+- 目标文件：多个文件
+- 依赖：A025
+- 内容：
+  - `GroupRepository` 新增 `deleteById` 方法。
+  - `MembershipRepository` 新增 `deleteByGroupId` 方法。
+  - 创建 `DeleteGroupUseCase`，校验操作人为小组负责人，且组内无项目时才能删除。
+  - 注册 Bean。
+  - 新增 `DELETE /groups/{groupId}` 端点。
+  - 前端新增 `deleteGroup` API 函数，小组详情页添加"删除小组"按钮和确认弹窗。
+- 验收：仅小组负责人可删除，有项目时提示先删除项目。
+
+### Phase 6 / U012-B [P] 实现页面间返回导航
+
+- 标记：[P]
+- 目标文件：`frontend/src/layouts/MainLayout.vue`
+- 依赖：U012
+- 内容：
+  - 在 MainLayout 标题左侧添加返回箭头按钮。
+  - 首页不显示返回箭头。
+  - 返回实现：`router.back()` 优先，无历史记录时按路由层级跳转。
+  - 项目子页面返回项目工作台，项目工作台和小组详情返回首页。
+- 验收：所有子页面标题左侧显示返回箭头，点击后回到正确上级页面。
+
 ### Phase 6 / U013 [P] 创建登录页面
 
 - 标记：[P]
@@ -1388,6 +1414,16 @@
 - 依赖：U008
 - 内容：展示可恢复文件，支持恢复操作。
 - 验收：按权限展示恢复入口。
+
+### Phase 6 / U019-B [P] 实现清空回收站功能
+
+- 标记：[P]
+- 目标文件：多个文件
+- 依赖：U019
+- 内容：
+  - 后端：创建 `EmptyTrashCommand` 和 `EmptyTrashUseCase`，新增 `deleteByProjectIdAndStatus` 仓储方法，注册 Bean，新增 `DELETE /projects/{projectId}/trash` API。
+  - 前端：新增 `emptyTrash()` API 函数，回收站抽屉添加"清空回收站"按钮和确认弹窗，删除后展示数量反馈。
+- 验收：负责人可清空回收站，清空前弹窗确认，清空后文件不可恢复，记录操作日志。
 
 ### Phase 6 / U020 [P] 创建任务进度页面
 
@@ -1510,5 +1546,11 @@
 F001 -> D001-D013 -> D014-D036 -> A001-A019 -> A020-A043 -> W001-W011 -> W012-W033 -> I001-I025 -> U001-U032
 ```
 
-最后生成时间：2026-05-24 15:55:17
+最后生成时间：2026-05-26 15:03:52
+
+## Phase 7: 小组删除补充
+
+目标：实现小组负责人删除小组（仅限无项目时），包括后端用例、接口和前端按钮。
+
+按 AGENTS.md 执行顺序：先 Domain/Repository 变更 → Application UseCase → Web API → Frontend。
 

@@ -101,6 +101,38 @@ cooperation-frontend | VITE v5.x.x  ready in 350 ms
 
 ---
 
+## 功能特性
+
+### 核心功能
+
+- **小组管理**：创建小组、邀请成员、管理成员权限
+- **项目管理**：创建项目、设置目录结构、管理项目状态
+- **文件管理**：上传、下载、移动、重命名、删除文件
+- **目录管理**：创建、删除目录，设置目录状态
+- **进度追踪**：查看项目完成进度、目录状态统计
+- **打包导出**：打包前检查、清理建议、导出压缩包
+- **邮件草稿**：生成邮件草稿、发送邮件
+- **操作记录**：查看所有操作历史
+- **通知系统**：接收平台内通知
+
+### 页面列表
+
+| 页面 | 路径 | 说明 |
+|---|---|---|
+| 项目总览 | `/` | 显示所有项目卡片，可创建小组和项目 |
+| 登录 | `/login` | 用户登录 |
+| 小组详情 | `/groups/:groupId` | 查看小组信息和成员 |
+| 项目工作台 | `/projects/:projectId` | 项目文件管理、目录操作 |
+| 任务进度 | `/projects/:projectId/progress` | 查看项目完成进度 |
+| 打包检查 | `/projects/:projectId/package/check` | 打包前检查问题 |
+| 打包导出 | `/projects/:projectId/package/export` | 导出压缩包 |
+| 邮件草稿 | `/projects/:projectId/mail` | 生成和发送邮件 |
+| 操作记录 | `/projects/:projectId/logs` | 查看操作历史 |
+| 通知 | `/notifications` | 查看通知消息 |
+| 邮件总览 | `/mail-drafts` | 查看所有邮件草稿 |
+
+---
+
 ## 项目目录结构（给想了解代码的同学）
 
 ```
@@ -109,7 +141,9 @@ cooperation/
 │   ├── src/main/java/              Java 源码
 │   │   └── com/cooperation/
 │   │       ├── application/        业务逻辑层（用例、命令、查询）
-│   │       └── domain/             领域模型层（实体、仓库接口）
+│   │       ├── domain/             领域模型层（实体、仓库接口）
+│   │       ├── infrastructure/     基础设施层（数据库、外部服务）
+│   │       └── web/                Web 层（控制器、请求/响应模型）
 │   ├── src/main/resources/         配置文件
 │   ├── src/test/                   后端测试
 │   ├── Dockerfile                  后端 Docker 镜像
@@ -117,15 +151,21 @@ cooperation/
 ├── frontend/                       前端（Vue 3）
 │   ├── src/
 │   │   ├── pages/                  页面组件
+│   │   ├── components/             通用组件
 │   │   ├── stores/                 Pinia 状态管理
-│   │   └── services/               API 请求封装
+│   │   ├── services/               API 请求封装
+│   │   ├── router/                 路由配置
+│   │   ├── types/                  TypeScript 类型定义
+│   │   └── layouts/                布局组件
 │   ├── index.html                  入口 HTML
 │   ├── Dockerfile                  前端 Docker 镜像
 │   └── package.json                npm 依赖管理
 ├── specs/                          SDD 需求文档和任务计划
 │   ├── spec.md                     需求规格说明
 │   ├── tasks.md                    开发任务清单
+│   ├── plan.md                     实施计划
 │   └── agent-dispatch-plan.md      Agent 调度计划
+├── data/                           运行时数据（已 git 忽略）
 ├── docker-compose.yml              一键部署编排文件
 ├── .env.example                    环境变量模板
 ├── AGENTS.md                       开发约定与 Agent 规范
@@ -270,3 +310,5 @@ npm config set registry https://registry.npmmirror.com
 - 后端所有敏感配置通过环境变量注入，不硬编码
 
 ---
+
+最后更新时间：2026-05-28 17:30:00
