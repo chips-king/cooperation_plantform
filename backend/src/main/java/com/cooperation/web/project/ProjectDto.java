@@ -51,4 +51,7 @@ public final class ProjectDto {
             LocalDateTime reopenedAt
     ) {
     }
+
+    public record DeleteProjectResponse(Long deletedProjectId) {
+    }
 }

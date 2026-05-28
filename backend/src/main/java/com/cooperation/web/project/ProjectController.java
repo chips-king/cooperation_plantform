@@ -1,6 +1,7 @@
 package com.cooperation.web.project;
 
 import com.cooperation.application.project.CreateProjectUseCase;
+import com.cooperation.application.project.DeleteProjectUseCase;
 import com.cooperation.application.project.EndProjectUseCase;
 import com.cooperation.application.project.GetProjectDetailUseCase;
 import com.cooperation.application.project.ReopenProjectUseCase;
@@ -11,11 +12,13 @@ import com.cooperation.web.common.PageResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,6 +32,7 @@ public class ProjectController {
     private final GetProjectDetailUseCase getProjectDetailUseCase;
     private final EndProjectUseCase endProjectUseCase;
     private final ReopenProjectUseCase reopenProjectUseCase;
+    private final DeleteProjectUseCase deleteProjectUseCase;
     private final ProjectRepository projectRepository;
 
     /**
@@ -45,12 +49,14 @@ public class ProjectController {
             GetProjectDetailUseCase getProjectDetailUseCase,
             EndProjectUseCase endProjectUseCase,
             ReopenProjectUseCase reopenProjectUseCase,
+            DeleteProjectUseCase deleteProjectUseCase,
             ProjectRepository projectRepository
     ) {
         this.createProjectUseCase = createProjectUseCase;
         this.getProjectDetailUseCase = getProjectDetailUseCase;
         this.endProjectUseCase = endProjectUseCase;
         this.reopenProjectUseCase = reopenProjectUseCase;
+        this.deleteProjectUseCase = deleteProjectUseCase;
         this.projectRepository = projectRepository;
     }
 
@@ -146,6 +152,19 @@ public class ProjectController {
                 new ReopenProjectUseCase.Command(projectId, actorId)
         );
         return ApiResponse.success(toProjectDetailResponse(result.project()));
+    }
+
+    /**
+     * 删除项目。
+     */
+    @DeleteMapping("/projects/{projectId}")
+    @Transactional
+    public ApiResponse<ProjectDto.DeleteProjectResponse> delete(
+            @RequestHeader("X-User-Id") Long actorId,
+            @PathVariable Long projectId
+    ) {
+        DeleteProjectUseCase.Result result = deleteProjectUseCase.delete(new DeleteProjectUseCase.Command(projectId, actorId));
+        return ApiResponse.success(new ProjectDto.DeleteProjectResponse(result.deletedProjectId()));
     }
 
     private ProjectDto.ProjectDetailResponse toProjectDetailResponse(Project project) {
