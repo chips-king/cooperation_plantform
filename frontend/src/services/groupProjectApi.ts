@@ -85,6 +85,19 @@ export function listGroups(
 }
 
 /**
+ * 删除小组。
+ *
+ * @param groupId 小组标识
+ * @returns 删除结果
+ */
+export function deleteGroup(groupId: number): Promise<{ deletedGroupId: number }> {
+  return request<{ deletedGroupId: number }>({
+    url: `/groups/${groupId}`,
+    method: 'DELETE',
+  });
+}
+
+/**
  * 创建小组。
  *
  * @param payload 小组名称和当前用户标识
@@ -175,6 +188,16 @@ export function endProject(projectId: number, options: CurrentUserRequestOptions
     url: `/projects/${projectId}/end`,
     method: 'POST',
     headers: userHeaders(options.userId),
+  });
+}
+
+/**
+ * 删除项目。
+ */
+export function deleteProject(projectId: number): Promise<{ deletedProjectId: number }> {
+  return request<{ deletedProjectId: number }>({
+    url: `/projects/${projectId}`,
+    method: 'DELETE',
   });
 }
 

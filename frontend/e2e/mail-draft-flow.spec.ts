@@ -29,6 +29,11 @@ async function mockMailApis(page: Page): Promise<void> {
       return;
     }
 
+    if (path === '/projects/1/mail-drafts' && method === 'GET') {
+      await route.fulfill({ json: ok([]) });
+      return;
+    }
+
     if (path === '/projects/1/mail-drafts' && method === 'POST') {
       await route.fulfill({
         json: ok({ draftId: 'draft-1', projectId: '1', recipients: ['teacher@example.com'], subject: '课程成果', body: '请查收', packageId: 'pkg-1', attachmentFilename: '课程成果.zip', status: 'draft', createdAt: '2026-05-25 10:10:00', sentAt: null }),

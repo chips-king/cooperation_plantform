@@ -23,6 +23,22 @@ async function mockCollaborationApis(page: Page): Promise<void> {
     const method = request.method();
 
     // 使用路径和方法分发 mock，覆盖上传、记录、检查和打包主流程。
+    if (path === '/projects/1' && method === 'GET') {
+      await route.fulfill({
+        json: ok({
+          id: 1,
+          name: '协作项目',
+          groupId: 1,
+          ownerId: 7,
+          status: 'IN_PROGRESS',
+          description: 'e2e 测试项目',
+          createdAt: '2026-05-01 09:00:00',
+          updatedAt: '2026-05-25 10:00:00',
+        }),
+      });
+      return;
+    }
+
     if (path === '/projects/1/tree') {
       await route.fulfill({
         json: ok({
@@ -33,7 +49,7 @@ async function mockCollaborationApis(page: Page): Promise<void> {
               parentId: null,
               name: '源文件',
               status: 'in_progress',
-              files: [{ fileId: 'file-1', name: 'main.java', size: 1280, mimeType: 'text/plain', versionNo: 1, status: 'active' }],
+              files: [{ fileId: 'file-1', name: 'main.java', size: 1280, mimeType: 'text/plain', versionNo: 1, status: 'active', uploadedAt: '2026-05-25T10:00:00' }],
               children: [],
             },
           ],
@@ -83,14 +99,14 @@ test('协作主流程可上传文件、查看记录、检查并生成压缩包',
   await mockCollaborationApis(page);
   await page.addInitScript(() => window.localStorage.setItem('access_token', 'e2e-token'));
 
-  await page.goto('/projects/1/files');
+  await page.goto('/projects/1');
   await expect(page.getByText('main.java')).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'README.md',
     mimeType: 'text/markdown',
     buffer: Buffer.from('# readme'),
   });
-  await expect(page.getByText('文件上传成功')).toBeVisible();
+  await expect(page.getByText('文件上传完成')).toBeVisible();
 
   await page.goto('/projects/1/logs');
   await page.getByRole('button', { name: '查询记录' }).click();

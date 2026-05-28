@@ -8,12 +8,24 @@
     @close="emit('update:modelValue', false)"
   >
     <section class="trash-drawer">
-      <el-alert
-        type="info"
-        :closable="false"
-        show-icon
-        title="回收站文件不会进入最终打包，可按权限恢复到目录。"
-      />
+      <div class="trash-drawer__actions">
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          title="回收站文件不会进入最终打包，可按权限恢复到目录。"
+        />
+        <el-button
+          v-if="canDelete && trashFiles.length > 0"
+          type="danger"
+          :icon="Delete"
+          plain
+          :loading="emptying"
+          @click="handleEmptyTrash"
+        >
+          清空回收站
+        </el-button>
+      </div>
 
       <el-form label-position="top" class="trash-drawer__restore-target">
         <el-form-item label="恢复目录">
@@ -57,9 +69,10 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { Delete } from '@element-plus/icons-vue';
 
-import { listTrashFiles, restoreFile } from '@/services/fileApi';
+import { emptyTrash, listTrashFiles, restoreFile } from '@/services/fileApi';
 
 import type { Directory, TrashFile } from '@/types/project';
 
@@ -73,8 +86,10 @@ const props = withDefaults(defineProps<{
   projectId: string;
   directories: Directory[];
   canRestore?: boolean;
+  canDelete?: boolean;
 }>(), {
   canRestore: true,
+  canDelete: true,
 });
 
 const emit = defineEmits<{
@@ -86,6 +101,7 @@ const loading = ref(false);
 const trashFiles = ref<TrashFile[]>([]);
 const restoreDirectoryId = ref('');
 const restoringFileId = ref('');
+const emptying = ref(false);
 
 const flatDirectories = computed(() => flattenDirectories(props.directories));
 
@@ -168,6 +184,38 @@ async function handleRestore(file: TrashFile): Promise<void> {
 }
 
 /**
+ * 清空回收站所有文件。
+ */
+async function handleEmptyTrash(): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      '清空后文件将永久删除且不可恢复，确认继续？',
+      '清空回收站',
+      {
+        confirmButtonText: '确认清空',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    );
+  } catch {
+    return;
+  }
+
+  emptying.value = true;
+
+  try {
+    const result = await emptyTrash(props.projectId);
+    ElMessage.success(`已清空回收站，共删除 ${result.deletedCount} 个文件`);
+    trashFiles.value = [];
+    emit('restored');
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '清空回收站失败');
+  } finally {
+    emptying.value = false;
+  }
+}
+
+/**
  * 格式化页面展示时间。
  *
  * @param value ISO 时间字符串
@@ -186,6 +234,18 @@ function formatDateTime(value: string): string {
 .trash-drawer {
   display: grid;
   gap: 16px;
+}
+
+.trash-drawer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.trash-drawer__actions > .el-alert {
+  flex: 1;
+  min-width: 0;
 }
 
 .trash-drawer__restore-target {

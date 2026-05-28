@@ -229,6 +229,19 @@ export function getProjectProgress(projectId: string): Promise<ProjectProgress> 
 }
 
 /**
+ * 清空项目回收站。
+ *
+ * @param projectId 项目标识
+ * @returns 删除数量
+ */
+export function emptyTrash(projectId: string): Promise<{ deletedCount: number }> {
+  return request<{ deletedCount: number }>({
+    url: `/projects/${projectId}/trash`,
+    method: 'DELETE',
+  });
+}
+
+/**
  * 更新目录进度状态。
  *
  * @param payload 目录标识、项目标识和目标状态
@@ -242,5 +255,62 @@ export function updateDirectoryStatus(payload: UpdateDirectoryStatusRequest): Pr
       projectId: payload.projectId,
       status: payload.status,
     },
+  });
+}
+
+// ==================== 文件评论 ====================
+
+/** 文件评论项。 */
+export interface FileComment {
+  id: number;
+  fileId: string;
+  userId: number;
+  username: string;
+  content: string;
+  createdAt: string;
+}
+
+/** 文件评论列表响应。 */
+export interface FileCommentListResponse {
+  comments: FileComment[];
+}
+
+/**
+ * 获取指定文件的评论列表。
+ *
+ * @param fileId 文件标识。
+ * @returns 评论列表。
+ */
+export function getFileComments(fileId: string): Promise<FileCommentListResponse> {
+  return request<FileCommentListResponse>({
+    url: `/files/${fileId}/comments`,
+    method: 'GET',
+  });
+}
+
+/**
+ * 添加评论到指定文件。
+ *
+ * @param fileId 文件标识。
+ * @param content 评论内容。
+ * @returns 新创建的评论。
+ */
+export function addFileComment(fileId: string, content: string): Promise<FileComment> {
+  return request<FileComment>({
+    url: `/files/${fileId}/comments`,
+    method: 'POST',
+    data: { content },
+  });
+}
+
+/**
+ * 删除指定评论。
+ *
+ * @param commentId 评论标识。
+ */
+export function deleteFileComment(commentId: number): Promise<void> {
+  return request<void>({
+    url: `/comments/${commentId}`,
+    method: 'DELETE',
   });
 }

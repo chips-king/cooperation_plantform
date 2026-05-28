@@ -1,6 +1,6 @@
 import { request } from './http';
 
-import type { MailDraft, SendMailDraftResponse } from '@/types/project';
+import type { DraftSummary, MailDraft, ProjectDraftListItem, SendMailDraftResponse } from '@/types/project';
 
 /**
  * 当前用户请求选项。
@@ -119,5 +119,56 @@ export function sendMailDraft(payload: SendMailDraftRequest): Promise<SendMailDr
     method: 'POST',
     headers: userHeaders(payload.userId),
     data: { confirmed: payload.confirmed },
+  });
+}
+
+/**
+ * 删除邮件草稿。
+ *
+ * @param draftId 草稿标识
+ * @param options 当前用户请求选项
+ */
+export function deleteMailDraft(draftId: string, options: CurrentUserRequestOptions = {}): Promise<void> {
+  return request<void>({
+    url: `/mail-drafts/${draftId}`,
+    method: 'DELETE',
+    headers: userHeaders(options.userId),
+  });
+}
+
+/**
+ * 查询当前用户参与的所有项目的草稿概览。
+ *
+ * @param options 当前用户请求选项
+ * @returns 项目草稿概览列表
+ */
+export function listUserDraftSummaries(options: CurrentUserRequestOptions = {}): Promise<DraftSummary[]> {
+  const userId = options.userId;
+  if (!userId) {
+    return Promise.resolve([]);
+  }
+
+  return request<DraftSummary[]>({
+    url: `/users/${userId}/mail-drafts`,
+    method: 'GET',
+    headers: userHeaders(userId),
+  });
+}
+
+/**
+ * 查询指定项目的所有草稿列表。
+ *
+ * @param projectId 项目标识
+ * @param options 当前用户请求选项
+ * @returns 项目草稿列表
+ */
+export function listProjectDrafts(
+  projectId: string,
+  options: CurrentUserRequestOptions = {},
+): Promise<ProjectDraftListItem[]> {
+  return request<ProjectDraftListItem[]>({
+    url: `/projects/${projectId}/mail-drafts`,
+    method: 'GET',
+    headers: userHeaders(options.userId),
   });
 }

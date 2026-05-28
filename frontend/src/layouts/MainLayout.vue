@@ -1,217 +1,339 @@
 <template>
-  <el-container class="main-layout">
-    <el-aside class="main-layout__aside" width="240px">
-      <section class="main-layout__brand">
-        <span class="main-layout__mark">协</span>
-        <div>
-          <strong>分工协作系统</strong>
-          <small>项目成果工作台</small>
+  <SidebarProvider :collapsible="'icon'">
+    <Sidebar>
+      <SidebarHeader>
+        <div class="sidebar-brand">
+          <span class="sidebar-brand-mark">协</span>
+          <span class="sidebar-brand-name">协作平台</span>
         </div>
-      </section>
+      </SidebarHeader>
 
-      <nav class="main-layout__nav" aria-label="主导航">
-        <RouterLink class="main-layout__nav-item" to="/">
-          <FolderOpened class="main-layout__nav-icon" />
-          <span>项目首页</span>
-        </RouterLink>
-        <RouterLink class="main-layout__nav-item" to="/notifications">
-          <Bell class="main-layout__nav-icon" />
-          <span>通知中心</span>
-        </RouterLink>
-      </nav>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <RouterLink v-slot="{ isActive, navigate }" to="/" custom>
+                <SidebarMenuButton
+                  :is-active="isActive"
+                  tooltip="项目总览"
+                  @click="navigate"
+                >
+                  <HomeFilled class="sidebar-icon" />
+                  <span>项目总览</span>
+                </SidebarMenuButton>
+              </RouterLink>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <RouterLink v-slot="{ isActive, navigate }" to="/notifications" custom>
+                <SidebarMenuButton
+                  :is-active="isActive"
+                  tooltip="通知中心"
+                  @click="navigate"
+                >
+                  <Bell class="sidebar-icon" />
+                  <span>通知中心</span>
+                </SidebarMenuButton>
+              </RouterLink>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <RouterLink v-slot="{ isActive, navigate }" to="/mail-drafts" custom>
+                <SidebarMenuButton
+                  :is-active="isActive || route.name === 'mail-draft'"
+                  tooltip="邮件草稿"
+                  @click="navigate"
+                >
+                  <Message class="sidebar-icon" />
+                  <span>邮件草稿</span>
+                </SidebarMenuButton>
+              </RouterLink>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
 
-      <section class="main-layout__side-slot">
+        <template v-if="projectNav.length > 0">
+          <SidebarSeparator />
+
+          <SidebarGroup>
+            <div class="sidebar-group-header">
+              <SidebarGroupLabel>项目导航</SidebarGroupLabel>
+            </div>
+            <SidebarMenu>
+              <SidebarMenuItem v-for="item in projectNav" :key="item.to">
+                <RouterLink v-slot="{ isActive, navigate }" :to="item.to" custom>
+                  <SidebarMenuButton
+                    :is-active="isActive"
+                    :tooltip="item.label"
+                    @click="navigate"
+                  >
+                    <component :is="item.icon" class="sidebar-icon" />
+                    <span>{{ item.label }}</span>
+                  </SidebarMenuButton>
+                </RouterLink>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        </template>
+      </SidebarContent>
+
+      <SidebarFooter>
         <slot name="aside" />
-      </section>
-    </el-aside>
+      </SidebarFooter>
+    </Sidebar>
 
-    <el-container>
-      <el-header class="main-layout__header">
-        <div class="main-layout__title">
-          <slot name="title">
-            <span>工作台</span>
-          </slot>
+    <SidebarInset>
+      <header class="main-header">
+        <div class="main-header__left">
+          <SidebarTrigger />
+          <el-button
+            v-if="canGoBack"
+            link
+            :icon="ArrowLeft"
+            style="margin-right: 8px; font-size: 14px"
+            @click="goBack"
+          />
+          <span class="main-header__title">{{ pageTitle }}</span>
         </div>
-
-        <div class="main-layout__actions">
+        <div class="main-header__right">
           <slot name="actions" />
-          <RouterLink class="main-layout__notice" to="/notifications" aria-label="打开通知中心">
-            <Bell class="main-layout__notice-icon" />
+          <RouterLink class="main-header__notice" to="/notifications">
+            <el-badge v-if="unreadCount > 0" :value="unreadCount" :max="99"
+              class="main-header__notice-badge">
+              <Bell class="main-header__notice-icon" />
+            </el-badge>
+            <Bell v-else class="main-header__notice-icon" />
           </RouterLink>
         </div>
-      </el-header>
+      </header>
 
-      <el-main class="main-layout__content">
+      <main class="main-content">
         <slot />
-      </el-main>
-    </el-container>
-  </el-container>
+      </main>
+    </SidebarInset>
+  </SidebarProvider>
 </template>
 
 <script setup lang="ts">
-import { Bell, FolderOpened } from '@element-plus/icons-vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
+import {
+  ArrowLeft,
+  Bell,
+  HomeFilled,
+  Message,
+  TrendCharts,
+} from '@element-plus/icons-vue';
+import { listNotifications } from '@/services/activityApi';
+import { useAuthStore } from '@/stores/auth';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarSeparator,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
 
-// 主布局只负责框架结构和插槽承载，不直接发起业务请求。
+const route = useRoute();
+const router = useRouter();
+const authStore = useAuthStore();
+
+const unreadCount = ref(0);
+
+async function fetchUnreadCount(): Promise<void> {
+  if (!authStore.currentUser?.id) return;
+  try {
+    const result = await listNotifications({
+      userId: authStore.currentUser.id,
+      read: false,
+    });
+    unreadCount.value = result.notifications?.length ?? 0;
+  } catch {
+    unreadCount.value = 0;
+  }
+}
+
+watch(() => route.path, () => {
+  void fetchUnreadCount();
+});
+
+onMounted(() => {
+  void fetchUnreadCount();
+});
+
+const titleMap: Record<string, string> = {
+  home: '项目总览',
+  'group-detail': '小组详情',
+  'project-workspace': '项目工作台',
+  'project-progress': '任务进度',
+  'mail-draft': '邮件草稿',
+  'mail-draft-overview': '邮件草稿',
+  'operation-logs': '操作记录',
+  notifications: '通知中心',
+};
+
+const pageTitle = computed(() => titleMap[String(route.name ?? '')] || '工作台');
+
+interface NavItem {
+  to: string;
+  label: string;
+  icon: object;
+}
+
+const projectNav = computed<NavItem[]>(() => {
+  const pid = route.params.projectId as string;
+  if (!pid) return [];
+  return [
+    { to: `/projects/${pid}`, label: '工作台', icon: HomeFilled },
+    { to: `/projects/${pid}/progress`, label: '任务进度', icon: TrendCharts },
+  ];
+});
+
+const backRouteMap: Record<
+  string,
+  string | ((params: Record<string, string>) => string)
+> = {
+  'group-detail': '/',
+  'project-workspace': '/',
+  'project-progress': (p) => `/projects/${p.projectId}`,
+  'package-check': (p) => `/projects/${p.projectId}`,
+  'package-export': (p) => `/projects/${p.projectId}`,
+  'mail-draft': '/mail-drafts',
+  'mail-draft-overview': '/',
+  'operation-logs': (p) => `/projects/${p.projectId}`,
+  notifications: '/',
+};
+
+const canGoBack = computed(() => {
+  const name = String(route.name ?? '');
+  return (
+    name !== 'home' &&
+    name !== 'login' &&
+    name !== '' &&
+    backRouteMap[name] !== undefined
+  );
+});
+
+function goBack(): void {
+  const name = String(route.name ?? '');
+  const target = backRouteMap[name];
+  if (typeof target === 'function') {
+    const params: Record<string, string> = {};
+    for (const key of Object.keys(route.params)) {
+      const val = route.params[key];
+      params[key] = Array.isArray(val) ? val[0] : String(val);
+    }
+    void router.push(target(params));
+  } else if (target) {
+    void router.push(target);
+  } else {
+    router.back();
+  }
+}
 </script>
 
-<style scoped>
-.main-layout {
-  min-height: 100vh;
-  color: #20242c;
-  background: #f6f7f9;
-}
-
-.main-layout__aside {
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid #d9dee7;
-  background: #ffffff;
-}
-
-.main-layout__brand {
+<style>
+/* 品牌 */
+.sidebar-brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 72px;
-  padding: 0 18px;
-  border-bottom: 1px solid #e4e7ed;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
-.main-layout__mark {
+.sidebar-brand-mark {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
-  color: #ffffff;
-  background: #1d4f91;
+  color: #fff;
+  background: linear-gradient(135deg, var(--sidebar-accent), var(--sidebar-accent-hover));
+  font-size: 16px;
   font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(var(--cb-color-primary-rgb), 0.3);
 }
 
-.main-layout__brand strong,
-.main-layout__brand small {
-  display: block;
-  line-height: 1.35;
+.sidebar-brand-name {
+  color: var(--sidebar-fg-active);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-.main-layout__brand small {
-  margin-top: 2px;
-  color: #687386;
-  font-size: 12px;
+/* 图标 */
+.sidebar-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
+  flex-shrink: 0;
 }
 
-.main-layout__nav {
-  display: grid;
-  gap: 4px;
-  padding: 14px 10px;
-}
-
-.main-layout__nav-item {
+/* 头部 */
+.main-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 0 12px;
+  height: 56px;
+  padding: 0 24px;
+  background: var(--cb-bg-card);
+  border-bottom: 1px solid var(--cb-border);
+  flex-shrink: 0;
+}
+
+.main-header__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.main-header__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cb-text-primary);
+}
+
+.main-header__right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.main-header__notice {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
   border-radius: 8px;
-  color: #3b4351;
+  color: var(--cb-text-secondary);
+  background: transparent;
+  transition: all 0.15s ease;
   text-decoration: none;
 }
 
-.main-layout__nav-item.router-link-active,
-.main-layout__nav-item:hover {
-  color: #173b70;
-  background: #eef3f8;
+.main-header__notice:hover {
+  background: var(--cb-bg-page);
+  color: var(--cb-text-primary);
 }
 
-.main-layout__nav-icon {
+.main-header__notice-icon {
   width: 18px;
   height: 18px;
 }
 
-.main-layout__side-slot {
+/* 内容区 */
+.main-content {
   flex: 1;
-  padding: 10px 18px 18px;
+  padding: 24px 28px;
   overflow: auto;
-}
-
-.main-layout__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 72px;
-  padding: 0 28px;
-  border-bottom: 1px solid #d9dee7;
-  background: #ffffff;
-}
-
-.main-layout__title {
-  min-width: 0;
-  color: #20242c;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.main-layout__actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.main-layout__notice {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid #d9dee7;
-  border-radius: 8px;
-  color: #3b4351;
-  background: #ffffff;
-}
-
-.main-layout__notice:hover {
-  color: #173b70;
-  border-color: #9ab2d3;
-  background: #f3f7fb;
-}
-
-.main-layout__notice-icon {
-  width: 18px;
-  height: 18px;
-}
-
-.main-layout__content {
-  min-width: 0;
-  padding: 28px;
-  overflow: auto;
-}
-
-@media (max-width: 768px) {
-  .main-layout {
-    display: block;
-  }
-
-  .main-layout__aside {
-    width: 100% !important;
-    border-right: 0;
-    border-bottom: 1px solid #d9dee7;
-  }
-
-  .main-layout__nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .main-layout__side-slot {
-    display: none;
-  }
-
-  .main-layout__header {
-    height: auto;
-    min-height: 64px;
-    padding: 14px 18px;
-  }
-
-  .main-layout__content {
-    padding: 18px;
-  }
 }
 </style>

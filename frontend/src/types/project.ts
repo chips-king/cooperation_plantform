@@ -217,6 +217,8 @@ export interface FileAsset {
   mimeType: string;
   versionNo: number;
   status: FileAssetStatus;
+  /** 上传时间，ISO 格式字符串 */
+  uploadedAt: string;
 }
 
 /**
@@ -284,6 +286,8 @@ export interface DirectoryProgress {
   status: DirectoryStatus;
   statusDisplayName: string;
   updatedAt: string;
+  fileCount: number;
+  mailSent: boolean;
 }
 
 /**
@@ -394,6 +398,28 @@ export interface MailDraft {
  */
 export interface SendMailDraftResponse extends MailDraft {
   message: string;
+}
+
+/**
+ * 项目草稿概览（用户维度汇总）。
+ */
+export interface DraftSummary {
+  projectId: string;
+  projectName: string;
+  draftCount: number;
+  /** 最近最终压缩包文件名，未打包时为 null */
+  latestPackageFilename: string | null;
+}
+
+/**
+ * 项目内草稿列表项。
+ */
+export interface ProjectDraftListItem {
+  draftId: string;
+  subject: string;
+  status: MailDraftStatus;
+  createdAt: string;
+  sentAt: string | null;
 }
 
 /**
