@@ -1,12 +1,14 @@
 package com.cooperation.web.group;
 
 import com.cooperation.application.group.CreateGroupUseCase;
+import com.cooperation.application.group.DeleteGroupUseCase;
 import com.cooperation.application.group.GetGroupDetailUseCase;
 import com.cooperation.application.group.ListGroupsUseCase;
 import com.cooperation.web.common.ApiResponse;
 import com.cooperation.web.common.PageResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +27,7 @@ public class GroupController {
     private final CreateGroupUseCase createGroupUseCase;
     private final ListGroupsUseCase listGroupsUseCase;
     private final GetGroupDetailUseCase getGroupDetailUseCase;
+    private final DeleteGroupUseCase deleteGroupUseCase;
 
     /**
      * 创建小组控制器实例。
@@ -32,15 +35,18 @@ public class GroupController {
      * @param createGroupUseCase 创建小组用例。
      * @param listGroupsUseCase 查询小组列表用例。
      * @param getGroupDetailUseCase 查询小组详情用例。
+     * @param deleteGroupUseCase 删除小组用例。
      */
     public GroupController(
             CreateGroupUseCase createGroupUseCase,
             ListGroupsUseCase listGroupsUseCase,
-            GetGroupDetailUseCase getGroupDetailUseCase
+            GetGroupDetailUseCase getGroupDetailUseCase,
+            DeleteGroupUseCase deleteGroupUseCase
     ) {
         this.createGroupUseCase = createGroupUseCase;
         this.listGroupsUseCase = listGroupsUseCase;
         this.getGroupDetailUseCase = getGroupDetailUseCase;
+        this.deleteGroupUseCase = deleteGroupUseCase;
     }
 
     /**
@@ -93,5 +99,21 @@ public class GroupController {
             @PathVariable Long groupId
     ) {
         return ApiResponse.success(getGroupDetailUseCase.get(new GetGroupDetailUseCase.Query(actorId, groupId)));
+    }
+
+    /**
+     * 删除小组。
+     *
+     * @param actorId 当前操作用户标识。
+     * @param groupId 小组标识。
+     * @return 统一删除小组响应。
+     */
+    @DeleteMapping("/groups/{groupId}")
+    public ApiResponse<GroupDto.DeleteGroupResponse> delete(
+            @RequestHeader("X-User-Id") Long actorId,
+            @PathVariable Long groupId
+    ) {
+        DeleteGroupUseCase.Result result = deleteGroupUseCase.delete(new DeleteGroupUseCase.Command(groupId, actorId));
+        return ApiResponse.success(new GroupDto.DeleteGroupResponse(result.deletedGroupId()));
     }
 }

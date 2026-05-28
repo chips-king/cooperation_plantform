@@ -22,4 +22,11 @@ public interface GroupRepository {
      * @return 找到时返回小组，否则返回空。
      */
     Optional<Group> findById(Long id);
+
+    /**
+     * 按小组标识删除小组。
+     *
+     * @param id 小组标识。
+     */
+    void deleteById(Long id);
 }

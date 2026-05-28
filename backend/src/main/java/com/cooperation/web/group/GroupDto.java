@@ -36,4 +36,12 @@ public final class GroupDto {
      */
     public record GroupResponse(Long id, String name, Long ownerId, String status) {
     }
+
+    /**
+     * 删除小组响应。
+     *
+     * @param deletedGroupId 被删除的小组标识。
+     */
+    public record DeleteGroupResponse(Long deletedGroupId) {
+    }
 }
