@@ -67,6 +67,12 @@ public class FileAssetEntity {
     private Long uploadedBy;
 
     /**
+     * 上传时间，对应 {@code uploaded_at}。
+     */
+    @TableField("uploaded_at")
+    private LocalDateTime uploadedAt;
+
+    /**
      * 同名版本组标识，对应 {@code version_group_id}。
      */
     @TableField("version_group_id")
@@ -256,6 +262,24 @@ public class FileAssetEntity {
      */
     public void setUploadedBy(Long uploadedBy) {
         this.uploadedBy = uploadedBy;
+    }
+
+    /**
+     * 获取上传时间。
+     *
+     * @return 上传时间
+     */
+    public LocalDateTime getUploadedAt() {
+        return uploadedAt;
+    }
+
+    /**
+     * 设置上传时间。
+     *
+     * @param uploadedAt 上传时间
+     */
+    public void setUploadedAt(LocalDateTime uploadedAt) {
+        this.uploadedAt = uploadedAt;
     }
 
     /**

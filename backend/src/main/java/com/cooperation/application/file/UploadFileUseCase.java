@@ -14,6 +14,7 @@ import com.cooperation.domain.permission.PermissionCode;
 
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -81,6 +82,7 @@ public final class UploadFileUseCase {
                 command.mimeType(),
                 storageKey,
                 command.uploadedBy(),
+                LocalDateTime.now(),
                 UUID.randomUUID().toString(),
                 1
         );

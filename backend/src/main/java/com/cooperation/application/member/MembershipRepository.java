@@ -42,4 +42,18 @@ public interface MembershipRepository {
      * @return 找到时返回成员关系，否则返回空。
      */
     Optional<Membership> findByProjectIdAndUserId(Long projectId, Long userId);
+
+    /**
+     * 按小组标识删除所有成员关系。
+     *
+     * @param groupId 小组标识。
+     */
+    void deleteByGroupId(Long groupId);
+
+    /**
+     * 按项目标识删除所有成员关系。
+     *
+     * @param projectId 项目标识。
+     */
+    void deleteByProjectId(Long projectId);
 }

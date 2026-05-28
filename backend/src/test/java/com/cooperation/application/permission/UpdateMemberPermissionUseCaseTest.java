@@ -120,6 +120,14 @@ class UpdateMemberPermissionUseCaseTest {
                     .filter(membership -> membership.getUserId().equals(userId))
                     .findFirst();
         }
+
+        @Override
+        public void deleteByGroupId(Long groupId) {
+        }
+
+        @Override
+        public void deleteByProjectId(Long projectId) {
+        }
     }
 
     /**

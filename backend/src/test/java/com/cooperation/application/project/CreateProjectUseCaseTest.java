@@ -108,6 +108,15 @@ class CreateProjectUseCaseTest {
         public List<Project> findRecentByUserId(Long userId, int limit) {
             return savedProject == null ? List.of() : List.of(savedProject);
         }
+
+        @Override
+        public void deleteById(Long id) {
+        }
+
+        @Override
+        public int countByGroupId(Long groupId) {
+            return savedProject == null ? 0 : (savedProject.getGroupId().equals(groupId) ? 1 : 0);
+        }
     }
 
     /**
@@ -138,6 +147,14 @@ class CreateProjectUseCaseTest {
                     .filter(membership -> membership.getProjectId().map(projectId::equals).orElse(false))
                     .filter(membership -> membership.getUserId().equals(userId))
                     .findFirst();
+        }
+
+        @Override
+        public void deleteByGroupId(Long groupId) {
+        }
+
+        @Override
+        public void deleteByProjectId(Long projectId) {
         }
     }
 

@@ -48,4 +48,13 @@ public interface FileAssetRepository {
      * @return 项目回收站文件集合。
      */
     List<FileAsset> findTrashedByProjectId(String projectId);
+
+    /**
+     * 按项目和状态删除文件资产。
+     *
+     * @param projectId 项目标识。
+     * @param status 文件状态。
+     * @return 删除的记录数。
+     */
+    int deleteByProjectIdAndStatus(String projectId, FileAssetStatus status);
 }

@@ -105,6 +105,31 @@ public class MyBatisProjectRepository implements ProjectRepository {
         );
     }
 
+    @Override
+    public int countByGroupId(Long groupId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM projects WHERE group_id = ?",
+                Integer.class,
+                groupId
+        );
+        return count != null ? count : 0;
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        // 按外键依赖顺序清理关联数据，避免违反外键约束。
+        jdbcTemplate.update("DELETE FROM notifications WHERE project_id = ?", id);
+        jdbcTemplate.update("DELETE FROM mail_drafts WHERE project_id = ?", id);
+        jdbcTemplate.update("DELETE FROM file_assets WHERE project_id = ?", id);
+        jdbcTemplate.update("UPDATE directories SET parent_id = NULL WHERE project_id = ?", id);
+        jdbcTemplate.update("DELETE FROM directories WHERE project_id = ?", id);
+        jdbcTemplate.update("DELETE FROM package_artifacts WHERE project_id = ?", id);
+        jdbcTemplate.update("DELETE FROM invitations WHERE project_id = ?", id);
+        jdbcTemplate.update("DELETE FROM memberships WHERE project_id = ?", id);
+        jdbcTemplate.update("UPDATE operation_logs SET project_id = NULL WHERE project_id = ?", id);
+        jdbcTemplate.update("DELETE FROM projects WHERE id = ?", id);
+    }
+
     /**
      * 插入新项目并按生成主键重新查询，确保负责人来自 {@code user_groups.owner_id}。
      *
@@ -123,20 +148,8 @@ public class MyBatisProjectRepository implements ProjectRepository {
         }, keyHolder);
 
         Number key = Objects.requireNonNull(keyHolder.getKey(), "项目主键生成失败");
-        createDefaultDirectory(key.longValue(), project.getOwnerId());
         return findById(key.longValue())
                 .orElseThrow(() -> new IllegalStateException("项目保存后无法读取"));
-    }
-
-    private void createDefaultDirectory(Long projectId, Long ownerId) {
-        jdbcTemplate.update("""
-                INSERT INTO directories (project_id, parent_id, name, status, created_by)
-                VALUES (?, NULL, ?, 'in_progress', ?)
-                """,
-                projectId,
-                "默认分工目录",
-                ownerId
-        );
     }
 
     /**

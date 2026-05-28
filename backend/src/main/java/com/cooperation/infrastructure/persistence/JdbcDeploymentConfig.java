@@ -6,14 +6,19 @@ import com.cooperation.application.group.GroupRepository;
 import com.cooperation.application.group.ListGroupsUseCase;
 import com.cooperation.application.invitation.Invitation;
 import com.cooperation.application.invitation.InvitationRepository;
+import com.cooperation.application.file.FileCommentUseCase;
 import com.cooperation.application.file.ListDirectoryTreeUseCase;
+import com.cooperation.application.log.ListOperationLogsUseCase;
 import com.cooperation.application.mail.CreateMailDraftUseCase;
+import com.cooperation.application.mail.DeleteMailDraftUseCase;
 import com.cooperation.application.mail.QueryMailDraftUseCase;
 import com.cooperation.application.mail.SendMailDraftUseCase;
 import com.cooperation.application.mail.UpdateMailDraftUseCase;
 import com.cooperation.application.member.Membership;
 import com.cooperation.application.member.MembershipRepository;
+import com.cooperation.application.packageartifact.DeletePackageUseCase;
 import com.cooperation.application.packageartifact.DownloadLatestPackageUseCase;
+import com.cooperation.application.packageartifact.ListPackagesUseCase;
 import com.cooperation.application.packageartifact.PackageArtifact;
 import com.cooperation.application.packageartifact.PackageArtifactRepository;
 import com.cooperation.application.packageartifact.PackageSourceEntry;
@@ -23,16 +28,19 @@ import com.cooperation.application.packageartifact.QueryLatestPackageUseCase;
 import com.cooperation.domain.check.ProjectFileTree;
 import com.cooperation.domain.check.CheckTarget;
 import com.cooperation.domain.log.OperationAction;
+import com.cooperation.domain.log.OperationAction;
 import com.cooperation.domain.mail.MailDraft;
 import com.cooperation.domain.notification.NotificationEventType;
 import com.cooperation.domain.packageartifact.PackageFormat;
-import com.cooperation.domain.permission.PermissionSet;
+import com.cooperation.domain.permission.RoleTemplate;
 import com.cooperation.domain.permission.RoleTemplate;
 import com.cooperation.infrastructure.mail.MailSmtpProperties;
 import com.cooperation.infrastructure.mail.SmtpMailDraftSender;
 import com.cooperation.infrastructure.storage.StorageProperties;
 import com.cooperation.web.file.FileDto;
 import com.cooperation.web.group.GroupDto.GroupResponse;
+import com.cooperation.web.mail.MailDraftDto;
+import com.cooperation.web.mail.MailDraftListPort;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.PreparedStatement;
@@ -145,6 +153,7 @@ public class JdbcDeploymentConfig {
 
     @Bean
     @ConditionalOnMissingBean
+    @Primary
     public ProjectPackageSnapshotRepository jdbcProjectPackageSnapshotRepository(JdbcTemplate jdbcTemplate) {
         return projectId -> new ProjectFileTree(jdbcTemplate.query("""
                 SELECT name, storage_key, size, status
@@ -172,11 +181,17 @@ public class JdbcDeploymentConfig {
             public void markAsLatest(String projectId, String packageId) {
                 store.markAsLatest(projectId, packageId);
             }
+
+            @Override
+            public void delete(String packageId) {
+                store.delete(packageId);
+            }
         };
     }
 
     @Bean
     @ConditionalOnMissingBean
+    @Primary
     public QueryLatestPackageUseCase jdbcQueryLatestPackageUseCase(JdbcTemplate jdbcTemplate) {
         JdbcPackageStore store = new JdbcPackageStore(jdbcTemplate);
         return query -> store.findLatestPackage(query.projectId())
@@ -185,6 +200,25 @@ public class JdbcDeploymentConfig {
 
     @Bean
     @ConditionalOnMissingBean
+    @Primary
+    public ListPackagesUseCase jdbcListPackagesUseCase(JdbcTemplate jdbcTemplate) {
+        JdbcPackageStore store = new JdbcPackageStore(jdbcTemplate);
+        return new ListPackagesUseCase(store);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @Primary
+    public DeletePackageUseCase jdbcDeletePackageUseCase(JdbcTemplate jdbcTemplate) {
+        JdbcPackageStore store = new JdbcPackageStore(jdbcTemplate);
+        return new DeletePackageUseCase(store, (projectId, actorId, action, targetId) -> {
+            // 简化版：不记录操作日志，实际项目中应该注入 OperationLogWriter
+        });
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @Primary
     public DownloadLatestPackageUseCase jdbcDownloadLatestPackageUseCase(JdbcTemplate jdbcTemplate, StorageProperties storageProperties) {
         JdbcPackageStore store = new JdbcPackageStore(jdbcTemplate);
         return command -> {
@@ -210,6 +244,7 @@ public class JdbcDeploymentConfig {
 
     @Bean
     @ConditionalOnMissingBean
+    @Primary
     public CreateMailDraftUseCase jdbcCreateMailDraftUseCase(JdbcTemplate jdbcTemplate) {
         JdbcMailStore store = new JdbcMailStore(jdbcTemplate);
         return new CreateMailDraftUseCase(store, store, store, store);
@@ -217,6 +252,7 @@ public class JdbcDeploymentConfig {
 
     @Bean
     @ConditionalOnMissingBean
+    @Primary
     public SendMailDraftUseCase jdbcSendMailDraftUseCase(
             JdbcTemplate jdbcTemplate,
             MailSmtpProperties mailProperties,
@@ -235,6 +271,7 @@ public class JdbcDeploymentConfig {
 
     @Bean
     @ConditionalOnMissingBean
+    @Primary
     public QueryMailDraftUseCase jdbcQueryMailDraftUseCase(JdbcTemplate jdbcTemplate) {
         JdbcMailStore store = new JdbcMailStore(jdbcTemplate);
         return query -> store.query(query.draftId());
@@ -242,9 +279,206 @@ public class JdbcDeploymentConfig {
 
     @Bean
     @ConditionalOnMissingBean
+    @Primary
     public UpdateMailDraftUseCase jdbcUpdateMailDraftUseCase(JdbcTemplate jdbcTemplate) {
         JdbcMailStore store = new JdbcMailStore(jdbcTemplate);
         return command -> store.update(command);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @Primary
+    public DeleteMailDraftUseCase jdbcDeleteMailDraftUseCase(JdbcTemplate jdbcTemplate) {
+        JdbcMailStore store = new JdbcMailStore(jdbcTemplate);
+        return new DeleteMailDraftUseCase(store, store, store);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @Primary
+    public com.cooperation.application.directory.ListProjectProgressUseCase jdbcListProjectProgressUseCase(JdbcTemplate jdbcTemplate) {
+        return projectId -> {
+            long projectKey = parseLong(projectId, "项目标识");
+
+            // 检查项目是否有已发送的邮件
+            Boolean mailSent = jdbcTemplate.queryForObject(
+                    "SELECT EXISTS(SELECT 1 FROM mail_drafts WHERE project_id = ? AND status = 'sent')",
+                    Boolean.class,
+                    projectKey
+            );
+            boolean projectMailSent = mailSent != null && mailSent;
+
+            // 查询目录及文件数量
+            List<com.cooperation.web.progress.ProgressDto.DirectoryProgressResponse> dirs = jdbcTemplate.query("""
+                    SELECT d.id, d.name, d.status, d.updated_at,
+                           COUNT(f.id) AS file_count
+                    FROM directories d
+                    LEFT JOIN file_assets f ON f.directory_id = d.id AND f.status = 'active'
+                    WHERE d.project_id = ? AND d.name != 'root'
+                    GROUP BY d.id, d.name, d.status, d.updated_at
+                    ORDER BY d.id ASC
+                    """, (rs, row) -> new com.cooperation.web.progress.ProgressDto.DirectoryProgressResponse(
+                    String.valueOf(rs.getLong("id")),
+                    rs.getString("name"),
+                    rs.getString("status"),
+                    com.cooperation.domain.directory.DirectoryStatus.fromValue(rs.getString("status")).getDisplayName(),
+                    rs.getTimestamp("updated_at").toInstant(),
+                    rs.getInt("file_count"),
+                    projectMailSent
+            ), projectKey);
+
+            int completed = (int) dirs.stream()
+                    .filter(d -> "completed".equals(d.status()))
+                    .count();
+
+            return new com.cooperation.web.progress.ProgressDto.ProjectProgressResponse(
+                    projectId,
+                    dirs.size(),
+                    completed,
+                    dirs
+            );
+        };
+    }
+
+    /**
+     * 部署态操作记录列表查询，从 MySQL 读取项目操作记录。
+     */
+    @Bean
+    @Primary
+    public ListOperationLogsUseCase jdbcListOperationLogsUseCase(
+            JdbcTemplate jdbcTemplate,
+            MembershipRepository memberships
+    ) {
+        return new ListOperationLogsUseCase(
+                query -> {
+                    StringBuilder sql = new StringBuilder("""
+                            SELECT id, project_id, actor_id, action, target_type, target_id, summary, created_at
+                            FROM operation_logs
+                            WHERE project_id = ?
+                            """);
+                    List<Object> params = new ArrayList<>();
+                    params.add(parseLong(query.projectId(), "项目标识"));
+                    query.action().ifPresent(action -> {
+                        sql.append(" AND action = ?");
+                        params.add(action.name());
+                    });
+                    query.actorId().ifPresent(actorId -> {
+                        sql.append(" AND actor_id = ?");
+                        params.add(actorId);
+                    });
+                    query.from().ifPresent(from -> {
+                        sql.append(" AND created_at >= ?");
+                        params.add(Timestamp.from(from));
+                    });
+                    query.to().ifPresent(to -> {
+                        sql.append(" AND created_at <= ?");
+                        params.add(Timestamp.from(to));
+                    });
+                    sql.append(" ORDER BY created_at DESC, id DESC");
+                    return jdbcTemplate.query(
+                            sql.toString(),
+                            (rs, rowNum) -> new ListOperationLogsUseCase.LogItem(
+                                    String.valueOf(rs.getLong("id")),
+                                    String.valueOf(rs.getLong("project_id")),
+                                    rs.getLong("actor_id"),
+                                    OperationAction.valueOf(rs.getString("action")),
+                                    rs.getString("target_type"),
+                                    rs.getString("target_id"),
+                                    rs.getString("summary"),
+                                    rs.getTimestamp("created_at").toInstant()
+                            ),
+                            params.toArray()
+                    );
+                },
+                (userId, projectId) -> memberships.findByProjectIdAndUserId(parseLong(projectId, "项目标识"), userId)
+                        .map(Membership::getRoleTemplate)
+                        .orElse(RoleTemplate.MEMBER)
+        );
+    }
+
+    @Bean
+    @Primary
+    public MailDraftListPort jdbcMailDraftListPort(JdbcTemplate jdbcTemplate) {
+        return new JdbcMailStore(jdbcTemplate);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public FileCommentUseCase jdbcFileCommentUseCase(JdbcTemplate jdbcTemplate) {
+        return new FileCommentUseCase(new FileCommentUseCase.CommentPort() {
+
+            @Override
+            public List<FileCommentUseCase.CommentItem> findByFileId(String fileId) {
+                return jdbcTemplate.query("""
+                        SELECT c.id, c.file_id, c.user_id, u.username, c.content, c.created_at
+                        FROM file_comments c
+                        JOIN users u ON u.id = c.user_id
+                        WHERE c.file_id = ?
+                        ORDER BY c.created_at ASC
+                        """, (rs, row) -> new FileCommentUseCase.CommentItem(
+                        rs.getLong("id"),
+                        rs.getString("file_id"),
+                        rs.getLong("user_id"),
+                        rs.getString("username"),
+                        rs.getString("content"),
+                        rs.getTimestamp("created_at").toInstant()
+                ), fileId);
+            }
+
+            @Override
+            public FileCommentUseCase.CommentItem save(FileCommentUseCase.CommentItem comment) {
+                org.springframework.jdbc.support.GeneratedKeyHolder keyHolder =
+                        new org.springframework.jdbc.support.GeneratedKeyHolder();
+                jdbcTemplate.update(connection -> {
+                    java.sql.PreparedStatement ps = connection.prepareStatement("""
+                            INSERT INTO file_comments (file_id, user_id, content)
+                            VALUES (?, ?, ?)
+                            """, java.sql.Statement.RETURN_GENERATED_KEYS);
+                    ps.setString(1, comment.fileId());
+                    ps.setLong(2, comment.userId());
+                    ps.setString(3, comment.content());
+                    return ps;
+                }, keyHolder);
+                long id = keyHolder.getKey() != null ? keyHolder.getKey().longValue() : 0;
+                // 查询保存后的完整记录（含 created_at）
+                return jdbcTemplate.queryForObject("""
+                        SELECT c.id, c.file_id, c.user_id, u.username, c.content, c.created_at
+                        FROM file_comments c
+                        JOIN users u ON u.id = c.user_id
+                        WHERE c.id = ?
+                        """, (rs, row) -> new FileCommentUseCase.CommentItem(
+                        rs.getLong("id"),
+                        rs.getString("file_id"),
+                        rs.getLong("user_id"),
+                        rs.getString("username"),
+                        rs.getString("content"),
+                        rs.getTimestamp("created_at").toInstant()
+                ), id);
+            }
+
+            @Override
+            public FileCommentUseCase.CommentItem findById(long commentId) {
+                List<FileCommentUseCase.CommentItem> results = jdbcTemplate.query("""
+                        SELECT c.id, c.file_id, c.user_id, u.username, c.content, c.created_at
+                        FROM file_comments c
+                        JOIN users u ON u.id = c.user_id
+                        WHERE c.id = ?
+                        """, (rs, row) -> new FileCommentUseCase.CommentItem(
+                        rs.getLong("id"),
+                        rs.getString("file_id"),
+                        rs.getLong("user_id"),
+                        rs.getString("username"),
+                        rs.getString("content"),
+                        rs.getTimestamp("created_at").toInstant()
+                ), commentId);
+                return results.isEmpty() ? null : results.get(0);
+            }
+
+            @Override
+            public void deleteById(long commentId) {
+                jdbcTemplate.update("DELETE FROM file_comments WHERE id = ?", commentId);
+            }
+        });
     }
 
     private static long parseLong(String value, String fieldName) {
@@ -275,7 +509,7 @@ public class JdbcDeploymentConfig {
         }, projectKey);
 
         jdbcTemplate.query("""
-                SELECT id, directory_id, name, size, mime_type, version_no, status
+                SELECT id, directory_id, name, size, mime_type, version_no, status, uploaded_at
                 FROM file_assets
                 WHERE project_id = ? AND status = 'active'
                 ORDER BY directory_id, name, version_no DESC
@@ -289,7 +523,8 @@ public class JdbcDeploymentConfig {
                         rs.getLong("size"),
                         rs.getString("mime_type"),
                         rs.getInt("version_no"),
-                        rs.getString("status")
+                        rs.getString("status"),
+                        rs.getObject("uploaded_at", java.time.LocalDateTime.class)
                 ));
             }
         }, projectKey);
@@ -376,6 +611,11 @@ public class JdbcDeploymentConfig {
                     Group.Status.ACTIVE
             ), id).stream().findFirst();
         }
+
+        @Override
+        public void deleteById(Long id) {
+            jdbcTemplate.update("DELETE FROM user_groups WHERE id = ?", id);
+        }
     }
 
     static final class JdbcMembershipRepository implements MembershipRepository {
@@ -429,6 +669,16 @@ public class JdbcDeploymentConfig {
             return query("WHERE project_id = ? AND user_id = ? AND status = 'active'", projectId, userId);
         }
 
+        @Override
+        public void deleteByGroupId(Long groupId) {
+            jdbcTemplate.update("DELETE FROM memberships WHERE group_id = ?", groupId);
+        }
+
+        @Override
+        public void deleteByProjectId(Long projectId) {
+            jdbcTemplate.update("DELETE FROM memberships WHERE project_id = ?", projectId);
+        }
+
         private Optional<Membership> query(String where, Object... args) {
             return jdbcTemplate.query("""
                     SELECT id, user_id, group_id, project_id, role_template FROM memberships
@@ -446,7 +696,7 @@ public class JdbcDeploymentConfig {
         }
     }
 
-    static final class JdbcPackageStore implements PackageSnapshotRepository, PackageArtifactRepository, CreateMailDraftUseCase.PackageRepository {
+    static final class JdbcPackageStore implements PackageSnapshotRepository, PackageArtifactRepository, CreateMailDraftUseCase.PackageRepository, ListPackagesUseCase.PackageRepository {
 
         private final JdbcTemplate jdbcTemplate;
 
@@ -498,6 +748,11 @@ public class JdbcDeploymentConfig {
         }
 
         @Override
+        public void delete(String packageId) {
+            jdbcTemplate.update("DELETE FROM package_artifacts WHERE id = ?", packageId);
+        }
+
+        @Override
         public Optional<CreateMailDraftUseCase.LatestPackage> findLatestUsableByProjectId(String projectId) {
             return findLatestPackage(projectId).map(result -> new CreateMailDraftUseCase.LatestPackage(result.packageId(), result.filename()));
         }
@@ -517,6 +772,23 @@ public class JdbcDeploymentConfig {
                     rs.getLong("size")
             ), parseLong(projectId, "项目标识")).stream().findFirst();
         }
+
+        @Override
+        public List<ListPackagesUseCase.Result> findAllByProjectId(String projectId) {
+            return jdbcTemplate.query("""
+                    SELECT id, filename, format, size, created_at, is_latest
+                    FROM package_artifacts
+                    WHERE project_id = ?
+                    ORDER BY created_at DESC
+                    """, (rs, row) -> new ListPackagesUseCase.Result(
+                    rs.getString("id"),
+                    rs.getString("filename"),
+                    rs.getString("format"),
+                    rs.getLong("size"),
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getBoolean("is_latest")
+            ), parseLong(projectId, "项目标识"));
+        }
     }
 
     static final class JdbcMailStore implements
@@ -524,9 +796,13 @@ public class JdbcDeploymentConfig {
             CreateMailDraftUseCase.MailDraftRepository,
             CreateMailDraftUseCase.OperationLogWriter,
             CreateMailDraftUseCase.NotificationPublisher,
+            DeleteMailDraftUseCase.MailDraftRepository,
+            DeleteMailDraftUseCase.OperationLogWriter,
+            DeleteMailDraftUseCase.NotificationPublisher,
             SendMailDraftUseCase.MailDraftRepository,
             SendMailDraftUseCase.OperationLogWriter,
-            SendMailDraftUseCase.NotificationPublisher {
+            SendMailDraftUseCase.NotificationPublisher,
+            MailDraftListPort {
 
         private final JdbcTemplate jdbcTemplate;
         private final JdbcPackageStore packageStore;
@@ -653,6 +929,63 @@ public class JdbcDeploymentConfig {
         }
 
         @Override
+        public List<MailDraftDto.DraftSummaryResponse> listDraftSummariesByUser(String userId) {
+            // memberships 以 group 维度记录；返回有邮件草稿或已有最终压缩包的项目
+            return jdbcTemplate.query("""
+                    SELECT p.id AS project_id,
+                           p.name AS project_name,
+                           COUNT(DISTINCT md.id) AS draft_count,
+                           MAX(pa.filename) AS latest_package_filename
+                    FROM memberships m
+                    JOIN projects p ON p.group_id = m.group_id
+                    LEFT JOIN mail_drafts md ON md.project_id = p.id
+                    LEFT JOIN package_artifacts pa ON pa.project_id = p.id AND pa.is_latest = 1
+                    WHERE m.user_id = ?
+                      AND m.status = 'active'
+                      AND (m.project_id IS NULL OR m.project_id = p.id)
+                    GROUP BY p.id, p.name
+                    HAVING COUNT(DISTINCT md.id) > 0 OR MAX(pa.id) IS NOT NULL
+                    ORDER BY p.name
+                    """, (rs, row) -> new MailDraftDto.DraftSummaryResponse(
+                    String.valueOf(rs.getLong("project_id")),
+                    rs.getString("project_name"),
+                    rs.getLong("draft_count"),
+                    rs.getString("latest_package_filename")
+            ), parseLong(userId, "用户标识"));
+        }
+
+        @Override
+        public List<MailDraftDto.ProjectDraftListItemResponse> listProjectDrafts(String projectId) {
+            return jdbcTemplate.query("""
+                    SELECT id, subject, status, created_at, sent_at
+                    FROM mail_drafts
+                    WHERE project_id = ?
+                    ORDER BY created_at DESC
+                    """, (rs, row) -> new MailDraftDto.ProjectDraftListItemResponse(
+                    String.valueOf(rs.getLong("id")),
+                    rs.getString("subject"),
+                    rs.getString("status"),
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getTimestamp("sent_at") == null ? null : rs.getTimestamp("sent_at").toInstant()
+            ), parseLong(projectId, "项目标识"));
+        }
+
+        @Override
+        public String deleteById(String draftId) {
+            // 先查出 project_id 用于操作日志，再删除
+            Long projectId = jdbcTemplate.queryForObject(
+                    "SELECT project_id FROM mail_drafts WHERE id = ?",
+                    Long.class,
+                    parseLong(draftId, "草稿标识")
+            );
+            if (projectId == null) {
+                throw new IllegalStateException("邮件草稿不存在");
+            }
+            jdbcTemplate.update("DELETE FROM mail_drafts WHERE id = ?", parseLong(draftId, "草稿标识"));
+            return String.valueOf(projectId);
+        }
+
+        @Override
         public void record(String projectId, String actorId, OperationAction action, String targetId) {
             jdbcTemplate.update("""
                     INSERT INTO operation_logs (project_id, actor_id, action, target_type, target_id, summary, metadata, created_at)
@@ -663,7 +996,7 @@ public class JdbcDeploymentConfig {
                     action.name(),
                     "mail",
                     targetId,
-                    action == OperationAction.MAIL_SENT ? "发送邮件" : "创建邮件草稿",
+                    action == OperationAction.MAIL_SENT ? "发送邮件" : action == OperationAction.MAIL_DRAFT_DELETED ? "删除邮件草稿" : "创建邮件草稿",
                     Timestamp.from(Instant.now()));
         }
 

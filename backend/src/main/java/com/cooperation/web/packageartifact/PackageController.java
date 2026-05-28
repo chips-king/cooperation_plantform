@@ -2,15 +2,19 @@ package com.cooperation.web.packageartifact;
 
 import com.cooperation.application.packageartifact.ApplyCleanupSuggestionUseCase;
 import com.cooperation.application.packageartifact.CreatePackageUseCase;
+import com.cooperation.application.packageartifact.DeletePackageUseCase;
 import com.cooperation.application.packageartifact.DownloadLatestPackageUseCase;
+import com.cooperation.application.packageartifact.ListPackagesUseCase;
 import com.cooperation.application.packageartifact.QueryLatestPackageUseCase;
 import com.cooperation.application.packageartifact.RunPackageCheckUseCase;
 import com.cooperation.domain.packageartifact.PackageFormat;
 import com.cooperation.web.common.ApiResponse;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,6 +33,8 @@ public class PackageController {
     private final CreatePackageUseCase createPackageUseCase;
     private final QueryLatestPackageUseCase queryLatestPackageUseCase;
     private final DownloadLatestPackageUseCase downloadLatestPackageUseCase;
+    private final DeletePackageUseCase deletePackageUseCase;
+    private final ListPackagesUseCase listPackagesUseCase;
 
     /**
      * 创建打包 Web API 控制器。
@@ -38,19 +44,25 @@ public class PackageController {
      * @param createPackageUseCase 创建压缩包用例
      * @param queryLatestPackageUseCase 查询最近压缩包用例
      * @param downloadLatestPackageUseCase 下载最近压缩包用例
+     * @param deletePackageUseCase 删除压缩包用例
+     * @param listPackagesUseCase 查询所有打包记录用例
      */
     public PackageController(
             RunPackageCheckUseCase runPackageCheckUseCase,
             ApplyCleanupSuggestionUseCase applyCleanupSuggestionUseCase,
             CreatePackageUseCase createPackageUseCase,
             QueryLatestPackageUseCase queryLatestPackageUseCase,
-            DownloadLatestPackageUseCase downloadLatestPackageUseCase
+            DownloadLatestPackageUseCase downloadLatestPackageUseCase,
+            DeletePackageUseCase deletePackageUseCase,
+            ListPackagesUseCase listPackagesUseCase
     ) {
         this.runPackageCheckUseCase = runPackageCheckUseCase;
         this.applyCleanupSuggestionUseCase = applyCleanupSuggestionUseCase;
         this.createPackageUseCase = createPackageUseCase;
         this.queryLatestPackageUseCase = queryLatestPackageUseCase;
         this.downloadLatestPackageUseCase = downloadLatestPackageUseCase;
+        this.deletePackageUseCase = deletePackageUseCase;
+        this.listPackagesUseCase = listPackagesUseCase;
     }
 
     /**
@@ -168,6 +180,36 @@ public class PackageController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + result.filename() + "\"")
                 .contentType(MediaType.parseMediaType(result.contentType()))
                 .body(result.content());
+    }
+
+    /**
+     * 查询项目所有打包记录。
+     *
+     * @param projectId 项目标识
+     * @return 打包记录列表
+     */
+    @GetMapping("/projects/{projectId}/packages")
+    public ApiResponse<List<PackageDto.PackageSummaryResponse>> listPackages(@PathVariable String projectId) {
+        List<ListPackagesUseCase.Result> results = listPackagesUseCase.handle(new ListPackagesUseCase.Query(projectId));
+        return ApiResponse.success(results.stream().map(PackageDto.PackageSummaryResponse::from).toList());
+    }
+
+    /**
+     * 删除指定压缩包。
+     *
+     * @param projectId 项目标识
+     * @param packageId 压缩包标识
+     * @param actorId 当前用户标识
+     * @return 空响应
+     */
+    @DeleteMapping("/projects/{projectId}/packages/{packageId}")
+    public ApiResponse<Void> deletePackage(
+            @PathVariable String projectId,
+            @PathVariable String packageId,
+            @RequestHeader("X-User-Id") String actorId
+    ) {
+        deletePackageUseCase.handle(new DeletePackageUseCase.Command(projectId, packageId, actorId));
+        return ApiResponse.successWithoutData();
     }
 
     /**

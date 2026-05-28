@@ -15,6 +15,7 @@ public final class FileAsset {
     private final String mimeType;
     private final String storageKey;
     private final String uploadedBy;
+    private final LocalDateTime uploadedAt;
     private String versionGroupId;
     private int versionNo;
     private FileAssetStatus status;
@@ -30,6 +31,7 @@ public final class FileAsset {
             String mimeType,
             String storageKey,
             String uploadedBy,
+            LocalDateTime uploadedAt,
             String versionGroupId,
             int versionNo
     ) {
@@ -41,6 +43,7 @@ public final class FileAsset {
         this.mimeType = mimeType;
         this.storageKey = storageKey;
         this.uploadedBy = uploadedBy;
+        this.uploadedAt = uploadedAt;
         this.versionGroupId = versionGroupId;
         this.versionNo = versionNo;
         this.status = FileAssetStatus.ACTIVE;
@@ -57,6 +60,7 @@ public final class FileAsset {
      * @param mimeType 文件 MIME 类型。
      * @param storageKey 内部存储键。
      * @param uploadedBy 上传人标识。
+     * @param uploadedAt 上传时间。
      * @param versionGroupId 同名版本组标识。
      * @param versionNo 版本序号。
      * @return 默认处于正常状态的文件实体。
@@ -70,10 +74,11 @@ public final class FileAsset {
             String mimeType,
             String storageKey,
             String uploadedBy,
+            LocalDateTime uploadedAt,
             String versionGroupId,
             int versionNo
     ) {
-        return new FileAsset(id, projectId, directoryId, name, size, mimeType, storageKey, uploadedBy, versionGroupId, versionNo);
+        return new FileAsset(id, projectId, directoryId, name, size, mimeType, storageKey, uploadedBy, uploadedAt, versionGroupId, versionNo);
     }
 
     /**
@@ -87,6 +92,7 @@ public final class FileAsset {
      * @param mimeType 文件 MIME 类型。
      * @param storageKey 内部存储键。
      * @param uploadedBy 上传人标识。
+     * @param uploadedAt 上传时间。
      * @param versionGroupId 同名版本组标识。
      * @param versionNo 版本序号。
      * @param status 当前文件状态。
@@ -103,13 +109,14 @@ public final class FileAsset {
             String mimeType,
             String storageKey,
             String uploadedBy,
+            LocalDateTime uploadedAt,
             String versionGroupId,
             int versionNo,
             FileAssetStatus status,
             String deletedBy,
             LocalDateTime deletedAt
     ) {
-        FileAsset fileAsset = new FileAsset(id, projectId, directoryId, name, size, mimeType, storageKey, uploadedBy, versionGroupId, versionNo);
+        FileAsset fileAsset = new FileAsset(id, projectId, directoryId, name, size, mimeType, storageKey, uploadedBy, uploadedAt, versionGroupId, versionNo);
         fileAsset.status = status;
         fileAsset.deletedBy = deletedBy;
         fileAsset.deletedAt = deletedAt;
@@ -226,6 +233,15 @@ public final class FileAsset {
      */
     public String uploadedBy() {
         return uploadedBy;
+    }
+
+    /**
+     * 获取上传时间。
+     *
+     * @return 文件上传时间。
+     */
+    public LocalDateTime uploadedAt() {
+        return uploadedAt;
     }
 
     /**

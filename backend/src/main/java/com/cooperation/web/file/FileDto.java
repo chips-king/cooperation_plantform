@@ -3,6 +3,7 @@ package com.cooperation.web.file;
 import com.cooperation.domain.file.FileAsset;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -51,6 +52,7 @@ public final class FileDto {
      * @param mimeType 文件 MIME 类型。
      * @param versionNo 文件版本号。
      * @param status 文件状态。
+     * @param uploadedAt 上传时间。
      */
     public record FileItemResponse(
             String fileId,
@@ -58,7 +60,8 @@ public final class FileDto {
             long size,
             String mimeType,
             int versionNo,
-            String status
+            String status,
+            LocalDateTime uploadedAt
     ) {
 
         /**
@@ -74,7 +77,8 @@ public final class FileDto {
                     file.size(),
                     file.mimeType(),
                     file.versionNo(),
-                    file.status().value()
+                    file.status().value(),
+                    file.uploadedAt()
             );
         }
     }
@@ -90,6 +94,7 @@ public final class FileDto {
      * @param versionNo 文件版本号。
      * @param status 文件状态。
      * @param archive 是否为压缩包。
+     * @param uploadedAt 上传时间。
      */
     public record UploadFileResponse(
             String fileId,
@@ -99,7 +104,8 @@ public final class FileDto {
             String duplicatePolicy,
             int versionNo,
             String status,
-            boolean archive
+            boolean archive,
+            LocalDateTime uploadedAt
     ) {
     }
 

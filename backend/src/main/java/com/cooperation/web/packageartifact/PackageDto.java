@@ -2,6 +2,7 @@ package com.cooperation.web.packageartifact;
 
 import com.cooperation.application.packageartifact.ApplyCleanupSuggestionUseCase;
 import com.cooperation.application.packageartifact.CreatePackageUseCase;
+import com.cooperation.application.packageartifact.ListPackagesUseCase;
 import com.cooperation.application.packageartifact.QueryLatestPackageUseCase;
 import com.cooperation.application.packageartifact.RunPackageCheckUseCase;
 import com.cooperation.domain.check.CheckIssue;
@@ -253,6 +254,22 @@ public final class PackageDto {
                     result.filename(),
                     result.format(),
                     result.snapshotCreatedAt(),
+                    result.size()
+            );
+        }
+
+        /**
+         * 从打包记录列表结果创建响应。
+         *
+         * @param result 打包记录列表结果
+         * @return 压缩包摘要响应
+         */
+        public static PackageSummaryResponse from(ListPackagesUseCase.Result result) {
+            return new PackageSummaryResponse(
+                    result.packageId(),
+                    result.filename(),
+                    result.format(),
+                    result.createdAt(),
                     result.size()
             );
         }

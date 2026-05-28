@@ -20,4 +20,11 @@ public interface PackageArtifactRepository {
      * @param packageId 压缩包标识
      */
     void markAsLatest(String projectId, String packageId);
+
+    /**
+     * 删除指定压缩包。
+     *
+     * @param packageId 压缩包标识
+     */
+    void delete(String packageId);
 }

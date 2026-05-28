@@ -8,12 +8,14 @@ import java.util.Objects;
 /**
  * 压缩服务请求。
  *
+ * @param packageId 压缩包标识，用于生成唯一存储路径
  * @param fileName 最终压缩包文件名
  * @param format 压缩格式
  * @param snapshotCreatedAt 打包快照创建时间
  * @param entries 需要进入压缩包的条目
  */
 public record PackageArchiveRequest(
+        String packageId,
         String fileName,
         PackageFormat format,
         Instant snapshotCreatedAt,
@@ -24,6 +26,10 @@ public record PackageArchiveRequest(
      * 校验压缩请求字段并复制条目列表。
      */
     public PackageArchiveRequest {
+        if (packageId == null || packageId.isBlank()) {
+            throw new IllegalArgumentException("压缩包标识不能为空");
+        }
+        packageId = packageId.trim();
         if (fileName == null || fileName.isBlank()) {
             throw new IllegalArgumentException("压缩包文件名不能为空");
         }

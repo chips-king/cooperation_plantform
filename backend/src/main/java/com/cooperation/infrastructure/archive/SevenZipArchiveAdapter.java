@@ -53,7 +53,7 @@ public class SevenZipArchiveAdapter implements PackageArchivePort {
         }
 
         Path root = storageProperties.getRoot().toAbsolutePath().normalize();
-        Path packageDirectory = root.resolve(PACKAGE_DIRECTORY).normalize();
+        Path packageDirectory = root.resolve(PACKAGE_DIRECTORY).resolve(request.packageId()).normalize();
         Path output = resolveOutputPath(root, packageDirectory, request.fileName());
 
         try {
@@ -75,7 +75,8 @@ public class SevenZipArchiveAdapter implements PackageArchivePort {
      */
     private void writeSevenZip(PackageArchiveRequest request, Path root, Path output) throws IOException {
         OpenOption[] options = {
-                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE
         };
         try (SeekableByteChannel outputChannel = Files.newByteChannel(output, options);

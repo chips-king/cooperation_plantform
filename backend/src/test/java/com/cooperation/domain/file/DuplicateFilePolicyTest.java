@@ -77,6 +77,7 @@ class DuplicateFilePolicyTest {
                 "application/octet-stream",
                 "project-files/" + id,
                 "user-1",
+                java.time.LocalDateTime.now(),
                 versionGroupId,
                 versionNo
         );

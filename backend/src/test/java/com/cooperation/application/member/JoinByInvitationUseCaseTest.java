@@ -125,6 +125,14 @@ class JoinByInvitationUseCaseTest {
                     .filter(membership -> membership.getProjectId().map(projectId::equals).orElse(false))
                     .filter(membership -> membership.getUserId().equals(userId));
         }
+
+        @Override
+        public void deleteByGroupId(Long groupId) {
+        }
+
+        @Override
+        public void deleteByProjectId(Long projectId) {
+        }
     }
 
     /**

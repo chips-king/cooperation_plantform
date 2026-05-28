@@ -23,6 +23,8 @@ import com.cooperation.web.file.FileDto.TrashFileResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.time.LocalDateTime;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -106,7 +108,7 @@ class FileControllerTest {
                         null,
                         "源代码",
                         "in_progress",
-                        List.of(new FileItemResponse(FILE_ID, "README.md", 128L, "text/markdown", 1, "active")),
+                        List.of(new FileItemResponse(FILE_ID, "README.md", 128L, "text/markdown", 1, "active", LocalDateTime.parse("2026-05-24T10:00:00"))),
                         List.of()
                 ))
         );
@@ -217,7 +219,7 @@ class FileControllerTest {
         given(uploadDirectoryResolver.resolveTargetDirectory(PROJECT_ID, DIRECTORY_ID, "src/views/App.vue", "1"))
                 .willReturn("88");
         given(uploadFileUseCase.upload(any())).willReturn(new UploadFileResult(
-                FileAsset.uploaded(FILE_ID, PROJECT_ID, "88", FileName.of("App.vue"), 128L, "text/x-vue", "storage/app", "1", "version-group-001", 1),
+                FileAsset.uploaded(FILE_ID, PROJECT_ID, "88", FileName.of("App.vue"), 128L, "text/x-vue", "storage/app", "1", LocalDateTime.now(), "version-group-001", 1),
                 false
         ));
 
@@ -274,7 +276,7 @@ class FileControllerTest {
     @DisplayName("POST /files/{fileId}/move 移动文件到目标目录")
     void shouldMoveFile() throws Exception {
         MoveFileRequest request = new MoveFileRequest(PROJECT_ID, "directory-target");
-        FileItemResponse response = new FileItemResponse(FILE_ID, "README.md", 128L, "text/markdown", 1, "active");
+        FileItemResponse response = new FileItemResponse(FILE_ID, "README.md", 128L, "text/markdown", 1, "active", LocalDateTime.parse("2026-05-24T10:00:00"));
         given(moveFileUseCase.move(eq(FILE_ID), any())).willReturn(response);
 
         mockMvc.perform(post("/files/{fileId}/move", FILE_ID)
@@ -365,7 +367,7 @@ class FileControllerTest {
      * @return 正常状态的测试文件实体
      */
     private FileAsset activeFile(int versionNo) {
-        return FileAsset.uploaded(FILE_ID, PROJECT_ID, DIRECTORY_ID, FileName.of("README.md"), 128L, "text/markdown", "storage/readme", "user-001", "version-group-001", versionNo);
+        return FileAsset.uploaded(FILE_ID, PROJECT_ID, DIRECTORY_ID, FileName.of("README.md"), 128L, "text/markdown", "storage/readme", "user-001", LocalDateTime.now(), "version-group-001", versionNo);
     }
 
     /**

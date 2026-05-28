@@ -29,6 +29,9 @@ public enum NotificationEventType {
     /** 邮件草稿创建事件。 */
     MAIL_DRAFT_CREATED,
 
+    /** 邮件草稿删除事件。 */
+    MAIL_DRAFT_DELETED,
+
     /** 邮件发送事件。 */
     MAIL_SENT,
 

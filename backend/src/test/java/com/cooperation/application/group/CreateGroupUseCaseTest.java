@@ -69,6 +69,10 @@ class CreateGroupUseCaseTest {
         public Optional<Group> findById(Long id) {
             return Optional.ofNullable(savedGroup).filter(group -> group.getId().equals(id));
         }
+
+        @Override
+        public void deleteById(Long id) {
+        }
     }
 
     /**
@@ -94,6 +98,14 @@ class CreateGroupUseCaseTest {
         @Override
         public Optional<Membership> findByProjectIdAndUserId(Long projectId, Long userId) {
             return Optional.empty();
+        }
+
+        @Override
+        public void deleteByGroupId(Long groupId) {
+        }
+
+        @Override
+        public void deleteByProjectId(Long projectId) {
         }
     }
 

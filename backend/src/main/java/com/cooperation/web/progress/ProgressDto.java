@@ -35,13 +35,17 @@ public final class ProgressDto {
      * @param status 目录状态值。
      * @param statusDisplayName 目录状态中文展示名。
      * @param updatedAt 最近更新时间。
+     * @param fileCount 目录下活跃文件数量。
+     * @param mailSent 项目是否已发送邮件。
      */
     public record DirectoryProgressResponse(
             String directoryId,
             String name,
             String status,
             String statusDisplayName,
-            Instant updatedAt
+            Instant updatedAt,
+            int fileCount,
+            boolean mailSent
     ) {
     }
 

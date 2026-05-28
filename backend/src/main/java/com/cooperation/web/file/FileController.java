@@ -4,6 +4,8 @@ import com.cooperation.application.file.DeleteFileCommand;
 import com.cooperation.application.file.DeleteFileUseCase;
 import com.cooperation.application.file.DirectoryManagementUseCase;
 import com.cooperation.application.file.DownloadFileUseCase;
+import com.cooperation.application.file.EmptyTrashCommand;
+import com.cooperation.application.file.EmptyTrashUseCase;
 import com.cooperation.application.file.ListDirectoryTreeUseCase;
 import com.cooperation.application.file.ListTrashFilesUseCase;
 import com.cooperation.application.file.MoveFileUseCase;
@@ -56,6 +58,7 @@ public class FileController {
     private final DeleteFileUseCase deleteFileUseCase;
     private final ListTrashFilesUseCase listTrashFilesUseCase;
     private final RestoreFileUseCase restoreFileUseCase;
+    private final EmptyTrashUseCase emptyTrashUseCase;
     private final UploadDirectoryResolver uploadDirectoryResolver;
     private final DirectoryManagementUseCase directoryManagementUseCase;
 
@@ -69,6 +72,7 @@ public class FileController {
      * @param deleteFileUseCase 文件删除用例。
      * @param listTrashFilesUseCase 回收站查询用例。
      * @param restoreFileUseCase 文件恢复用例。
+     * @param emptyTrashUseCase 清空回收站用例。
      * @param uploadDirectoryResolver 上传目录解析端口。
      * @param directoryManagementUseCase 目录管理用例。
      */
@@ -80,6 +84,7 @@ public class FileController {
             DeleteFileUseCase deleteFileUseCase,
             ListTrashFilesUseCase listTrashFilesUseCase,
             RestoreFileUseCase restoreFileUseCase,
+            EmptyTrashUseCase emptyTrashUseCase,
             UploadDirectoryResolver uploadDirectoryResolver,
             DirectoryManagementUseCase directoryManagementUseCase
     ) {
@@ -90,6 +95,7 @@ public class FileController {
         this.deleteFileUseCase = deleteFileUseCase;
         this.listTrashFilesUseCase = listTrashFilesUseCase;
         this.restoreFileUseCase = restoreFileUseCase;
+        this.emptyTrashUseCase = emptyTrashUseCase;
         this.uploadDirectoryResolver = uploadDirectoryResolver;
         this.directoryManagementUseCase = directoryManagementUseCase;
     }
@@ -262,6 +268,22 @@ public class FileController {
         return ApiResponse.success(FileItemResponse.from(file));
     }
 
+    /**
+     * 清空项目回收站。
+     *
+     * @param projectId 项目标识。
+     * @param actorId 操作人标识。
+     * @return 统一删除数量响应。
+     */
+    @DeleteMapping("/projects/{projectId}/trash")
+    public ApiResponse<java.util.Map<String, Integer>> emptyTrash(
+            @PathVariable String projectId,
+            @RequestHeader(value = "X-User-Id", defaultValue = "1") String actorId
+    ) {
+        int count = emptyTrashUseCase.empty(new EmptyTrashCommand(projectId, actorId));
+        return ApiResponse.success(java.util.Map.of("deletedCount", count));
+    }
+
     private UploadFileResponse toUploadResponse(UploadFileResult result, String duplicatePolicy) {
         FileAsset file = result.file();
         return new UploadFileResponse(
@@ -272,7 +294,8 @@ public class FileController {
                 duplicatePolicy,
                 file.versionNo(),
                 file.status().value(),
-                result.archive()
+                result.archive(),
+                file.uploadedAt()
         );
     }
 

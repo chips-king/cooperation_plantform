@@ -51,7 +51,7 @@ public class ZipArchiveAdapter implements PackageArchivePort {
         }
 
         Path root = storageProperties.getRoot().toAbsolutePath().normalize();
-        Path packageDirectory = root.resolve(PACKAGE_DIRECTORY).normalize();
+        Path packageDirectory = root.resolve(PACKAGE_DIRECTORY).resolve(request.packageId()).normalize();
         Path output = resolveOutputPath(packageDirectory, request.fileName());
 
         try {
@@ -59,7 +59,8 @@ public class ZipArchiveAdapter implements PackageArchivePort {
             writeZip(request, root, output);
             return new PackageArchiveResult(toStorageKey(root, output), Files.size(output));
         } catch (IOException ex) {
-            throw new IllegalStateException("生成 zip 压缩包失败", ex);
+            throw new IllegalStateException(
+                    "生成 zip 压缩包失败: " + ex.getMessage() + " (输出路径=" + output + ")", ex);
         }
     }
 
@@ -73,7 +74,8 @@ public class ZipArchiveAdapter implements PackageArchivePort {
      */
     private void writeZip(PackageArchiveRequest request, Path root, Path output) throws IOException {
         OpenOption[] options = {
-                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE
         };
         try (OutputStream fileOutput = Files.newOutputStream(output, options);
@@ -82,9 +84,14 @@ public class ZipArchiveAdapter implements PackageArchivePort {
                 // 每个条目独立校验源路径和压缩包内路径，防止路径穿越和绝对路径写入。
                 Path source = resolveStoragePath(root, entry.storageKey(), "源文件存储键非法");
                 String zipPath = normalizeZipEntryPath(entry.path());
-                zipOutput.putNextEntry(new ZipEntry(zipPath));
-                Files.copy(source, zipOutput);
-                zipOutput.closeEntry();
+                try {
+                    zipOutput.putNextEntry(new ZipEntry(zipPath));
+                    Files.copy(source, zipOutput);
+                    zipOutput.closeEntry();
+                } catch (IOException ex) {
+                    throw new IOException(
+                            "写入 zip 条目失败: zipPath=" + zipPath + ", source=" + source + ", cause=" + ex.getMessage(), ex);
+                }
             }
         }
     }
@@ -114,14 +121,14 @@ public class ZipArchiveAdapter implements PackageArchivePort {
      */
     private Path resolveStoragePath(Path root, String storageKey, String message) {
         if (storageKey == null || storageKey.isBlank()) {
-            throw new IllegalArgumentException(message);
+            throw new IllegalArgumentException(message + " (storageKey=" + storageKey + ")");
         }
         Path path = root.resolve(storageKey.trim()).toAbsolutePath().normalize();
         if (!path.startsWith(root)) {
-            throw new IllegalArgumentException(message);
+            throw new IllegalArgumentException(message + " (路径越界: " + path + ")");
         }
         if (!Files.isRegularFile(path)) {
-            throw new IllegalArgumentException("源文件不存在或不是普通文件");
+            throw new IllegalArgumentException("源文件不存在或不是普通文件 (path=" + path + ")");
         }
         return path;
     }

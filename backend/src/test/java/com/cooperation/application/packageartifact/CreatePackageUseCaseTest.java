@@ -134,6 +134,11 @@ class CreatePackageUseCaseTest {
             latestPackageId = packageId;
         }
 
+        @Override
+        public void delete(String packageId) {
+            saved.removeIf(a -> a.id().equals(packageId));
+        }
+
         private List<String> savedPackageIds() {
             return saved.stream().map(PackageArtifact::id).toList();
         }

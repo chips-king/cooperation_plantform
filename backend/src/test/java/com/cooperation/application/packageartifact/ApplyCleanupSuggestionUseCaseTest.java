@@ -106,6 +106,7 @@ class ApplyCleanupSuggestionUseCaseTest {
                 "application/octet-stream",
                 "storage/" + id,
                 "member-1",
+                java.time.LocalDateTime.now(),
                 id,
                 1
         );

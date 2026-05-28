@@ -28,7 +28,7 @@ public class MyBatisFileAssetRepository implements FileAssetRepository {
      */
     private static final String SELECT_COLUMNS = """
             SELECT id, project_id, directory_id, name, size, mime_type, storage_key,
-                   uploaded_by, version_group_id, version_no, status, deleted_by, deleted_at
+                   uploaded_by, uploaded_at, version_group_id, version_no, status, deleted_by, deleted_at
             FROM file_assets
             """;
 
@@ -69,8 +69,8 @@ public class MyBatisFileAssetRepository implements FileAssetRepository {
                 """
                         INSERT INTO file_assets (
                             id, project_id, directory_id, name, size, mime_type, extension, storage_key,
-                            uploaded_by, version_group_id, version_no, status, deleted_at, deleted_by
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            uploaded_by, uploaded_at, version_group_id, version_no, status, deleted_at, deleted_by
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE
                             project_id = VALUES(project_id),
                             directory_id = VALUES(directory_id),
@@ -80,6 +80,7 @@ public class MyBatisFileAssetRepository implements FileAssetRepository {
                             extension = VALUES(extension),
                             storage_key = VALUES(storage_key),
                             uploaded_by = VALUES(uploaded_by),
+                            uploaded_at = VALUES(uploaded_at),
                             version_group_id = VALUES(version_group_id),
                             version_no = VALUES(version_no),
                             status = VALUES(status),
@@ -95,6 +96,7 @@ public class MyBatisFileAssetRepository implements FileAssetRepository {
                 extractExtension(fileAsset.name()),
                 fileAsset.storageKey(),
                 parseRequiredLong(fileAsset.uploadedBy(), "上传人标识"),
+                fileAsset.uploadedAt(),
                 fileAsset.versionGroupId(),
                 fileAsset.versionNo(),
                 fileAsset.status().value(),
@@ -168,6 +170,16 @@ public class MyBatisFileAssetRepository implements FileAssetRepository {
         );
     }
 
+    @Override
+    public int deleteByProjectIdAndStatus(String projectId, FileAssetStatus status) {
+        Objects.requireNonNull(status, "文件状态不能为空");
+        return jdbcTemplate.update(
+                "DELETE FROM file_assets WHERE project_id = ? AND status = ?",
+                parseRequiredLong(projectId, "项目标识"),
+                status.value()
+        );
+    }
+
     /**
      * 执行单条文件资产查询。
      *
@@ -201,6 +213,7 @@ public class MyBatisFileAssetRepository implements FileAssetRepository {
                 resultSet.getString("mime_type"),
                 resultSet.getString("storage_key"),
                 String.valueOf(resultSet.getLong("uploaded_by")),
+                resultSet.getObject("uploaded_at", LocalDateTime.class),
                 resultSet.getString("version_group_id"),
                 resultSet.getInt("version_no"),
                 toStatus(resultSet.getString("status")),

@@ -49,6 +49,7 @@ public class CreatePackageUseCase {
      */
     public Result create(Command command) {
         Objects.requireNonNull(command, "创建压缩包命令不能为空");
+        String packageId = UUID.randomUUID().toString();
         String fullName = PackageFileName.of(command.baseName(), command.format()).fullName();
         Instant snapshotCreatedAt = snapshots.snapshotCreatedAt(command.projectId());
         List<PackageArchiveEntry> archiveEntries = snapshots.findSnapshotEntries(command.projectId()).stream()
@@ -56,9 +57,8 @@ public class CreatePackageUseCase {
                 .map(PackageArchiveEntry::fromSource)
                 .toList();
         PackageArchiveResult archiveResult = archivePort.create(
-                new PackageArchiveRequest(fullName, command.format(), snapshotCreatedAt, archiveEntries)
+                new PackageArchiveRequest(packageId, fullName, command.format(), snapshotCreatedAt, archiveEntries)
         );
-        String packageId = UUID.randomUUID().toString();
         PackageArtifact artifact = PackageArtifact.create(
                 packageId,
                 command.projectId(),

@@ -1,11 +1,14 @@
 package com.cooperation.web.mail;
 
 import com.cooperation.application.mail.CreateMailDraftUseCase;
+import com.cooperation.application.mail.DeleteMailDraftUseCase;
 import com.cooperation.application.mail.QueryMailDraftUseCase;
 import com.cooperation.application.mail.SendMailDraftUseCase;
 import com.cooperation.application.mail.UpdateMailDraftUseCase;
 import com.cooperation.web.common.ApiResponse;
 import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +27,8 @@ public class MailDraftController {
     private final QueryMailDraftUseCase queryMailDraftUseCase;
     private final UpdateMailDraftUseCase updateMailDraftUseCase;
     private final SendMailDraftUseCase sendMailDraftUseCase;
+    private final DeleteMailDraftUseCase deleteMailDraftUseCase;
+    private final MailDraftListPort mailDraftListPort;
 
     /**
      * 创建邮件草稿控制器。
@@ -32,17 +37,23 @@ public class MailDraftController {
      * @param queryMailDraftUseCase 查询邮件草稿用例
      * @param updateMailDraftUseCase 更新邮件草稿用例
      * @param sendMailDraftUseCase 发送邮件草稿用例
+     * @param deleteMailDraftUseCase 删除邮件草稿用例
+     * @param mailDraftListPort 邮件草稿列表查询端口
      */
     public MailDraftController(
             CreateMailDraftUseCase createMailDraftUseCase,
             QueryMailDraftUseCase queryMailDraftUseCase,
             UpdateMailDraftUseCase updateMailDraftUseCase,
-            SendMailDraftUseCase sendMailDraftUseCase
+            SendMailDraftUseCase sendMailDraftUseCase,
+            DeleteMailDraftUseCase deleteMailDraftUseCase,
+            MailDraftListPort mailDraftListPort
     ) {
         this.createMailDraftUseCase = createMailDraftUseCase;
         this.queryMailDraftUseCase = queryMailDraftUseCase;
         this.updateMailDraftUseCase = updateMailDraftUseCase;
         this.sendMailDraftUseCase = sendMailDraftUseCase;
+        this.deleteMailDraftUseCase = deleteMailDraftUseCase;
+        this.mailDraftListPort = mailDraftListPort;
     }
 
     /**
@@ -144,5 +155,47 @@ public class MailDraftController {
                 result.draft(),
                 result.message()
         ));
+    }
+
+    /**
+     * 删除邮件草稿。
+     *
+     * @param draftId 草稿标识
+     * @param actorId 当前用户标识
+     * @return 空响应
+     */
+    @DeleteMapping("/mail-drafts/{draftId}")
+    public ApiResponse<Void> deleteMailDraft(
+            @PathVariable String draftId,
+            @RequestHeader("X-User-Id") String actorId
+    ) {
+        deleteMailDraftUseCase.handle(new DeleteMailDraftUseCase.Command(draftId, actorId));
+        return ApiResponse.successWithoutData();
+    }
+
+    /**
+     * 查询当前用户参与的所有项目的草稿概览。
+     *
+     * @param userId 当前用户标识
+     * @return 项目草稿概览列表
+     */
+    @GetMapping("/users/{userId}/mail-drafts")
+    public ApiResponse<List<MailDraftDto.DraftSummaryResponse>> listUserDraftSummaries(
+            @PathVariable String userId
+    ) {
+        return ApiResponse.success(mailDraftListPort.listDraftSummariesByUser(userId));
+    }
+
+    /**
+     * 查询指定项目的所有草稿列表。
+     *
+     * @param projectId 项目标识
+     * @return 项目草稿列表
+     */
+    @GetMapping("/projects/{projectId}/mail-drafts")
+    public ApiResponse<List<MailDraftDto.ProjectDraftListItemResponse>> listProjectDrafts(
+            @PathVariable String projectId
+    ) {
+        return ApiResponse.success(mailDraftListPort.listProjectDrafts(projectId));
     }
 }

@@ -1,11 +1,14 @@
 package com.cooperation.web.common;
 
+import com.cooperation.common.error.ErrorCode;
 import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -71,6 +74,51 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException exception) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.failure("FORBIDDEN", exception.getMessage()));
+    }
+
+    /**
+     * 处理缺少必填请求头。
+     *
+     * @param exception 缺少请求头异常
+     * @return 统一校验错误响应
+     */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingRequestHeader(MissingRequestHeaderException exception) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.failure("VALIDATION_ERROR", "缺少请求头: " + exception.getHeaderName()));
+    }
+
+    /**
+     * 处理数据库唯一约束或外键冲突。
+     *
+     * @param exception 数据完整性异常
+     * @return 统一冲突错误响应
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+        String detail = exception.getMostSpecificCause().getMessage();
+        if (detail != null && detail.contains("uk_package_artifacts_storage_key")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiResponse.failure("CONFLICT", "同名压缩包已存在，请更换文件名后重试"));
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.failure("CONFLICT", "数据冲突，请刷新后重试"));
+    }
+
+    /**
+     * 处理未捕获的服务器异常，返回可读错误信息便于前端展示。
+     *
+     * @param exception 未预期异常
+     * @return 统一内部错误响应
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception exception) {
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) {
+            message = "服务器内部错误";
+        }
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.failure(ErrorCode.INTERNAL_ERROR.name(), message));
     }
 
     private ApiResponse.FieldErrorItem toFieldErrorItem(FieldError error) {

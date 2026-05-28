@@ -56,6 +56,9 @@ public enum OperationAction {
     /** 创建邮件草稿。 */
     MAIL_DRAFT_CREATED,
 
+    /** 删除邮件草稿。 */
+    MAIL_DRAFT_DELETED,
+
     /** 邮件发送成功。 */
     MAIL_SENT,
 
@@ -63,5 +66,8 @@ public enum OperationAction {
     PROJECT_ENDED,
 
     /** 项目重新打开。 */
-    PROJECT_REOPENED
+    PROJECT_REOPENED,
+
+    /** 项目被删除。 */
+    PROJECT_DELETED
 }

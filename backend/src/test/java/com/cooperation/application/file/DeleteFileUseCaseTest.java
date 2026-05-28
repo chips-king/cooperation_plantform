@@ -79,6 +79,7 @@ class DeleteFileUseCaseTest {
                 "application/octet-stream",
                 "project-files/" + id,
                 "member-1",
+                java.time.LocalDateTime.now(),
                 "version-" + id,
                 1
         );
@@ -115,6 +116,19 @@ class DeleteFileUseCaseTest {
         @Override
         public List<FileAsset> findTrashedByProjectId(String projectId) {
             return saved.stream().filter(file -> file.projectId().equals(projectId)).filter(file -> file.status() == FileAssetStatus.TRASHED).toList();
+        }
+
+        @Override
+        public int deleteByProjectIdAndStatus(String projectId, FileAssetStatus status) {
+            int[] count = {0};
+            saved.removeIf(file -> {
+                if (file.projectId().equals(projectId) && file.status() == status) {
+                    count[0]++;
+                    return true;
+                }
+                return false;
+            });
+            return count[0];
         }
     }
 

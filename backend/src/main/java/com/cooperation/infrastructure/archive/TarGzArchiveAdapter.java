@@ -52,7 +52,7 @@ public class TarGzArchiveAdapter implements PackageArchivePort {
         }
 
         Path root = storageProperties.getRoot().toAbsolutePath().normalize();
-        Path packageDirectory = root.resolve(PACKAGE_DIRECTORY).normalize();
+        Path packageDirectory = root.resolve(PACKAGE_DIRECTORY).resolve(request.packageId()).normalize();
         Path output = resolveOutputPath(root, packageDirectory, request.fileName());
 
         try {
@@ -74,7 +74,8 @@ public class TarGzArchiveAdapter implements PackageArchivePort {
      */
     private void writeTarGz(PackageArchiveRequest request, Path root, Path output) throws IOException {
         OpenOption[] options = {
-                StandardOpenOption.CREATE_NEW,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE
         };
         try (OutputStream fileOutput = Files.newOutputStream(output, options);

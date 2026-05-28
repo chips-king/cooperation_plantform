@@ -39,4 +39,19 @@ public enum DirectoryStatus {
     public String getDisplayName() {
         return displayName;
     }
+
+    /**
+     * 根据持久化值查找对应枚举。
+     *
+     * @param value 持久化值。
+     * @return 对应的目录状态枚举。
+     */
+    public static DirectoryStatus fromValue(String value) {
+        for (DirectoryStatus status : values()) {
+            if (status.value.equals(value)) {
+                return status;
+            }
+        }
+        throw new IllegalArgumentException("未知目录状态: " + value);
+    }
 }

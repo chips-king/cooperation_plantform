@@ -123,7 +123,7 @@ class PackageArchiveIT {
                 "demo-project/docs/readme.md",
                 "docs/readme.md",
                 "# Demo\n");
-        return new PackageArchiveRequest(fileName, format, SNAPSHOT_CREATED_AT, List.of(mainFile, readmeFile));
+        return new PackageArchiveRequest("package-it-001", fileName, format, SNAPSHOT_CREATED_AT, List.of(mainFile, readmeFile));
     }
 
     /**

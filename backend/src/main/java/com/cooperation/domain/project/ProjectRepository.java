@@ -32,4 +32,14 @@ public interface ProjectRepository {
      * @return 最近参与项目列表。
      */
     List<Project> findRecentByUserId(Long userId, int limit);
+
+    /**
+     * 按小组标识统计项目数量。
+     *
+     * @param groupId 小组标识。
+     * @return 该小组下的项目数量。
+     */
+    int countByGroupId(Long groupId);
+
+    void deleteById(Long id);
 }

@@ -234,4 +234,38 @@ public final class MailDraftDto {
     private static String toStatusValue(MailDraft draft) {
         return draft.getStatus().name().toLowerCase();
     }
+
+    /**
+     * 项目草稿概览响应（用户维度汇总）。
+     *
+     * @param projectId 项目标识
+     * @param projectName 项目名称
+     * @param draftCount 草稿数量
+     * @param latestPackageFilename 最近最终压缩包文件名，未打包时为空
+     */
+    public record DraftSummaryResponse(
+            String projectId,
+            String projectName,
+            long draftCount,
+            String latestPackageFilename
+    ) {
+    }
+
+    /**
+     * 项目内草稿列表项响应。
+     *
+     * @param draftId 草稿标识
+     * @param subject 邮件主题
+     * @param status 草稿状态
+     * @param createdAt 创建时间
+     * @param sentAt 发送时间，未发送时为空
+     */
+    public record ProjectDraftListItemResponse(
+            String draftId,
+            String subject,
+            String status,
+            Instant createdAt,
+            Instant sentAt
+    ) {
+    }
 }

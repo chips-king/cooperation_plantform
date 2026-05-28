@@ -111,6 +111,19 @@ public class LocalFileStorageAdapter implements FileStoragePort {
         return normalized.isBlank() ? DEFAULT_FILENAME : normalized;
     }
 
+    @Override
+    public byte[] load(String storageKey) {
+        Objects.requireNonNull(storageKey, "存储键不能为空");
+        Path root = properties.getRoot().toAbsolutePath().normalize();
+        Path file = root.resolve(storageKey.replace('/', '\\')).normalize();
+        ensureInsideRoot(root, file);
+        try {
+            return Files.readAllBytes(file);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("读取文件失败", exception);
+        }
+    }
+
     private void ensureInsideRoot(Path root, Path target) {
         if (!target.startsWith(root)) {
             throw new IllegalArgumentException("文件存储路径必须位于配置根目录内");

@@ -11,8 +11,10 @@ import com.cooperation.application.file.ListDirectoryTreeUseCase;
 import com.cooperation.application.file.ListTrashFilesUseCase;
 import com.cooperation.application.file.MoveFileUseCase;
 import com.cooperation.application.file.RestoreFileUseCase;
+import com.cooperation.application.file.EmptyTrashUseCase;
 import com.cooperation.application.file.UploadFileUseCase;
 import com.cooperation.application.group.CreateGroupUseCase;
+import com.cooperation.application.group.DeleteGroupUseCase;
 import com.cooperation.application.group.GetGroupDetailUseCase;
 import com.cooperation.application.group.Group;
 import com.cooperation.application.group.GroupRepository;
@@ -23,6 +25,7 @@ import com.cooperation.application.log.ListOperationLogsUseCase;
 import com.cooperation.application.log.OperationLogWriter;
 import com.cooperation.application.log.QueryOperationLogUseCase;
 import com.cooperation.application.mail.CreateMailDraftUseCase;
+import com.cooperation.application.mail.DeleteMailDraftUseCase;
 import com.cooperation.application.mail.QueryMailDraftUseCase;
 import com.cooperation.application.mail.SendMailDraftUseCase;
 import com.cooperation.application.mail.UpdateMailDraftUseCase;
@@ -48,6 +51,7 @@ import com.cooperation.application.packageartifact.RunPackageCheckUseCase;
 import com.cooperation.application.permission.PermissionChecker;
 import com.cooperation.application.permission.UpdateMemberPermissionUseCase;
 import com.cooperation.application.project.CreateProjectUseCase;
+import com.cooperation.application.project.DeleteProjectUseCase;
 import com.cooperation.application.project.EndProjectUseCase;
 import com.cooperation.application.project.GetProjectDetailUseCase;
 import com.cooperation.application.project.ReopenProjectUseCase;
@@ -57,6 +61,7 @@ import com.cooperation.domain.directory.DirectoryNode;
 import com.cooperation.domain.directory.DirectoryStatus;
 import com.cooperation.domain.file.FileAsset;
 import com.cooperation.domain.file.FileAssetRepository;
+import com.cooperation.domain.file.FileAssetStatus;
 import com.cooperation.domain.log.OperationAction;
 import com.cooperation.domain.log.OperationLog;
 import com.cooperation.domain.log.OperationLogRepository;
@@ -69,6 +74,8 @@ import com.cooperation.domain.project.Project;
 import com.cooperation.domain.project.ProjectRepository;
 import com.cooperation.web.file.FileDto;
 import com.cooperation.web.group.GroupDto;
+import com.cooperation.web.mail.MailDraftDto;
+import com.cooperation.web.mail.MailDraftListPort;
 import com.cooperation.web.progress.ProgressDto;
 import com.cooperation.web.project.ProjectDto;
 import java.time.Clock;
@@ -82,9 +89,10 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 应用运行期 Bean 装配配置，为尚未接入完整持久化的端口提供可启动、可联调的最小实现。
@@ -158,6 +166,20 @@ public class ApplicationRuntimeConfig {
     }
 
     /**
+     * 注册清空回收站用例。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public EmptyTrashUseCase emptyTrashUseCase(
+            FileAssetRepository files,
+            PermissionChecker permissionChecker,
+            OperationLogWriter operationLogs,
+            NotificationPublisher notifications
+    ) {
+        return new EmptyTrashUseCase(files, permissionChecker, operationLogs, notifications);
+    }
+
+    /**
      * 注册目录状态更新用例。
      */
     @Bean
@@ -182,6 +204,20 @@ public class ApplicationRuntimeConfig {
             OperationLogRepository operationLogRepository
     ) {
         return new CreateGroupUseCase(groupRepository, membershipRepository, operationLogRepository);
+    }
+
+    /**
+     * 注册删除小组用例。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public DeleteGroupUseCase deleteGroupUseCase(
+            GroupRepository groupRepository,
+            ProjectRepository projectRepository,
+            MembershipRepository membershipRepository,
+            OperationLogRepository operationLogRepository
+    ) {
+        return new DeleteGroupUseCase(groupRepository, projectRepository, membershipRepository, operationLogRepository);
     }
 
     /**
@@ -256,6 +292,19 @@ public class ApplicationRuntimeConfig {
     }
 
     /**
+     * 注册删除项目用例。
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public DeleteProjectUseCase deleteProjectUseCase(
+            ProjectRepository projectRepository,
+            MembershipRepository membershipRepository,
+            OperationLogRepository operationLogRepository
+    ) {
+        return new DeleteProjectUseCase(projectRepository, membershipRepository, operationLogRepository);
+    }
+
+    /**
      * 注册打包检查用例。
      */
     @Bean
@@ -287,7 +336,6 @@ public class ApplicationRuntimeConfig {
     @ConditionalOnMissingBean
     public CreatePackageUseCase createPackageUseCase(
             PackageSnapshotRepository snapshots,
-            @Qualifier("zipArchiveAdapter")
             PackageArchivePort archivePort,
             PackageArtifactRepository packages,
             OperationLogRepository logs
@@ -299,7 +347,7 @@ public class ApplicationRuntimeConfig {
      * 注册邮件草稿创建用例。
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
     public CreateMailDraftUseCase createMailDraftUseCase(RuntimeMailStore store) {
         return new CreateMailDraftUseCase(store, store, store, store);
     }
@@ -308,9 +356,18 @@ public class ApplicationRuntimeConfig {
      * 注册邮件草稿发送用例。
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
     public SendMailDraftUseCase sendMailDraftUseCase(RuntimeMailStore store, Clock clock) {
         return new SendMailDraftUseCase(store, store, store, store, clock);
+    }
+
+    /**
+     * 注册邮件草稿删除用例。
+     */
+    @Bean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
+    public DeleteMailDraftUseCase deleteMailDraftUseCase(RuntimeMailStore store) {
+        return new DeleteMailDraftUseCase(store, store, store);
     }
 
     /**
@@ -455,9 +512,9 @@ public class ApplicationRuntimeConfig {
      */
     @Bean
     @ConditionalOnMissingBean
-    public DownloadFileUseCase downloadFileUseCase(FileAssetRepository files) {
+    public DownloadFileUseCase downloadFileUseCase(FileAssetRepository files, FileStoragePort storage) {
         return fileId -> files.findById(fileId)
-                .map(file -> new FileDto.DownloadResponse(file.name().value(), file.mimeType(), new byte[0]))
+                .map(file -> new FileDto.DownloadResponse(file.name().value(), file.mimeType(), storage.load(file.storageKey())))
                 .orElseThrow(() -> new IllegalArgumentException("文件不存在"));
     }
 
@@ -489,7 +546,9 @@ public class ApplicationRuntimeConfig {
                         DEFAULT_DIRECTORY_NAME,
                         DirectoryStatus.IN_PROGRESS.getValue(),
                         DirectoryStatus.IN_PROGRESS.getDisplayName(),
-                        Instant.now()
+                        Instant.now(),
+                        0,
+                        false
                 ))
         );
     }
@@ -542,7 +601,7 @@ public class ApplicationRuntimeConfig {
      * 查询操作记录列表。
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(ListOperationLogsUseCase.class)
     public ListOperationLogsUseCase listOperationLogsUseCase() {
         return new ListOperationLogsUseCase(query -> List.of(), (userId, projectId) -> RoleTemplate.MEMBER);
     }
@@ -581,7 +640,7 @@ public class ApplicationRuntimeConfig {
      * 查询邮件草稿详情。
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
     public QueryMailDraftUseCase queryMailDraftUseCase(RuntimeMailStore store) {
         return query -> store.findById(query.draftId())
                 .map(draft -> new QueryMailDraftUseCase.Result(
@@ -603,7 +662,7 @@ public class ApplicationRuntimeConfig {
      * 更新邮件草稿。
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
     public UpdateMailDraftUseCase updateMailDraftUseCase(RuntimeMailStore store) {
         return command -> {
             MailDraft draft = store.findById(command.draftId())
@@ -625,10 +684,19 @@ public class ApplicationRuntimeConfig {
     }
 
     /**
+     * 邮件草稿列表查询端口。
+     */
+    @Bean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
+    public MailDraftListPort mailDraftListPort(RuntimeMailStore store) {
+        return store;
+    }
+
+    /**
      * 查询最近压缩包。
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
     public QueryLatestPackageUseCase queryLatestPackageUseCase(RuntimeMailStore store) {
         return query -> store.latestPackageSummary(query.projectId());
     }
@@ -650,7 +718,7 @@ public class ApplicationRuntimeConfig {
      * 打包检查快照仓储。
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
     public ProjectPackageSnapshotRepository projectPackageSnapshotRepository() {
         return projectId -> new ProjectFileTree(List.of());
     }
@@ -659,7 +727,7 @@ public class ApplicationRuntimeConfig {
      * 打包源快照仓储。
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
     public PackageSnapshotRepository packageSnapshotRepository() {
         return new RuntimePackageSnapshotRepository();
     }
@@ -668,7 +736,7 @@ public class ApplicationRuntimeConfig {
      * 压缩包元数据仓储。
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(JdbcTemplate.class)
     public PackageArtifactRepository packageArtifactRepository(RuntimeMailStore store) {
         return store;
     }
@@ -758,6 +826,18 @@ public class ApplicationRuntimeConfig {
                     .limit(Math.max(limit, 0))
                     .toList();
         }
+
+        @Override
+        public int countByGroupId(Long groupId) {
+            return (int) projects.values().stream()
+                    .filter(project -> Objects.equals(project.getGroupId(), groupId))
+                    .count();
+        }
+
+        @Override
+        public void deleteById(Long id) {
+            projects.remove(id);
+        }
     }
 
     /**
@@ -801,6 +881,20 @@ public class ApplicationRuntimeConfig {
                     .filter(file -> !file.isActive())
                     .filter(file -> Objects.equals(file.projectId(), projectId))
                     .toList();
+        }
+
+        @Override
+        public int deleteByProjectIdAndStatus(String projectId, FileAssetStatus status) {
+            int[] count = {0};
+            files.entrySet().removeIf(entry -> {
+                FileAsset file = entry.getValue();
+                if (Objects.equals(file.projectId(), projectId) && file.status() == status) {
+                    count[0]++;
+                    return true;
+                }
+                return false;
+            });
+            return count[0];
         }
     }
 
@@ -867,6 +961,11 @@ public class ApplicationRuntimeConfig {
         public Optional<Group> findById(Long id) {
             return Optional.ofNullable(groups.get(id));
         }
+
+        @Override
+        public void deleteById(Long id) {
+            groups.remove(id);
+        }
     }
 
     static final class RuntimeMembershipStore implements MembershipRepository {
@@ -904,6 +1003,16 @@ public class ApplicationRuntimeConfig {
                     .filter(membership -> Objects.equals(membership.getUserId(), userId))
                     .findFirst()
                     .or(() -> Optional.of(Membership.projectLevel(userId, 1L, projectId, RoleTemplate.OWNER)));
+        }
+
+        @Override
+        public void deleteByGroupId(Long groupId) {
+            memberships.values().removeIf(membership -> Objects.equals(membership.getGroupId(), groupId));
+        }
+
+        @Override
+        public void deleteByProjectId(Long projectId) {
+            memberships.values().removeIf(membership -> membership.getProjectId().map(projectId::equals).orElse(false));
         }
     }
 
@@ -944,7 +1053,11 @@ public class ApplicationRuntimeConfig {
             SendMailDraftUseCase.MailProviderPort,
             SendMailDraftUseCase.OperationLogWriter,
             SendMailDraftUseCase.NotificationPublisher,
-            PackageArtifactRepository {
+            DeleteMailDraftUseCase.MailDraftRepository,
+            DeleteMailDraftUseCase.OperationLogWriter,
+            DeleteMailDraftUseCase.NotificationPublisher,
+            PackageArtifactRepository,
+            MailDraftListPort {
 
         private static final String DEFAULT_PACKAGE_ID = "package-demo";
         private static final String DEFAULT_PACKAGE_FILENAME = "final-report.zip";
@@ -970,6 +1083,15 @@ public class ApplicationRuntimeConfig {
         }
 
         @Override
+        public String deleteById(String draftId) {
+            MailDraft removed = drafts.remove(draftId);
+            if (removed == null) {
+                throw new IllegalStateException("邮件草稿不存在");
+            }
+            return removed.getProjectId();
+        }
+
+        @Override
         public void sendDraft(String draftId, MailDraft draft) {
             throw new IllegalStateException("邮箱服务未配置，无法发送邮件，请先配置邮箱服务或人工下载附件发送");
         }
@@ -980,6 +1102,45 @@ public class ApplicationRuntimeConfig {
 
         @Override
         public void publishToGroup(String projectId, NotificationEventType type) {
+        }
+
+        @Override
+        public List<MailDraftDto.DraftSummaryResponse> listDraftSummariesByUser(String userId) {
+            // 运行时模式：汇总有草稿或已打包的项目
+            java.util.Set<String> projectIds = new java.util.LinkedHashSet<>();
+            drafts.values().forEach(draft -> projectIds.add(draft.getProjectId()));
+            projectIds.addAll(latestPackages.keySet());
+            if (projectIds.isEmpty()) {
+                return List.of();
+            }
+            return projectIds.stream()
+                    .map(projectId -> {
+                        long draftCount = drafts.values().stream()
+                                .filter(draft -> projectId.equals(draft.getProjectId()))
+                                .count();
+                        QueryLatestPackageUseCase.Result latest = latestPackages.get(projectId);
+                        String packageFilename = latest == null ? null : latest.filename();
+                        return new MailDraftDto.DraftSummaryResponse(
+                                projectId,
+                                "示例项目",
+                                draftCount,
+                                packageFilename);
+                    })
+                    .toList();
+        }
+
+        @Override
+        public List<MailDraftDto.ProjectDraftListItemResponse> listProjectDrafts(String projectId) {
+            return drafts.values().stream()
+                    .filter(d -> d.getProjectId().equals(projectId))
+                    .map(d -> new MailDraftDto.ProjectDraftListItemResponse(
+                            d.getId() == null ? "draft-001" : d.getId(),
+                            d.getSubject(),
+                            d.getStatus().name().toLowerCase(),
+                            Instant.now(),
+                            d.getSentAt()
+                    ))
+                    .toList();
         }
 
         @Override
@@ -996,6 +1157,11 @@ public class ApplicationRuntimeConfig {
 
         @Override
         public void markAsLatest(String projectId, String packageId) {
+        }
+
+        @Override
+        public void delete(String packageId) {
+            latestPackages.values().removeIf(result -> result.packageId().equals(packageId));
         }
 
         private QueryLatestPackageUseCase.Result latestPackageSummary(String projectId) {

@@ -6,6 +6,7 @@ import com.cooperation.application.permission.PermissionChecker;
 import com.cooperation.domain.file.DuplicateFilePolicy;
 import com.cooperation.domain.file.FileAsset;
 import com.cooperation.domain.file.FileAssetRepository;
+import com.cooperation.domain.file.FileAssetStatus;
 import com.cooperation.domain.file.FileName;
 import com.cooperation.domain.log.OperationAction;
 import com.cooperation.domain.log.OperationLog;
@@ -226,6 +227,7 @@ class UploadFileUseCaseTest {
                 "application/octet-stream",
                 "project-files/" + id,
                 "member-1",
+                java.time.LocalDateTime.now(),
                 versionGroupId,
                 versionNo
         );
@@ -267,6 +269,19 @@ class UploadFileUseCaseTest {
         public List<FileAsset> findTrashedByProjectId(String projectId) {
             return saved.stream().filter(file -> file.projectId().equals(projectId)).filter(file -> file.status().name().equals("TRASHED")).toList();
         }
+
+        @Override
+        public int deleteByProjectIdAndStatus(String projectId, FileAssetStatus status) {
+            int[] count = {0};
+            saved.removeIf(file -> {
+                if (file.projectId().equals(projectId) && file.status() == status) {
+                    count[0]++;
+                    return true;
+                }
+                return false;
+            });
+            return count[0];
+        }
     }
 
     /**
@@ -279,6 +294,11 @@ class UploadFileUseCaseTest {
         public String save(String projectId, String directoryId, String filename, byte[] content) {
             savedNames.add(filename);
             return "project-files/" + projectId + "/" + filename;
+        }
+
+        @Override
+        public byte[] load(String storageKey) {
+            return new byte[0];
         }
     }
 

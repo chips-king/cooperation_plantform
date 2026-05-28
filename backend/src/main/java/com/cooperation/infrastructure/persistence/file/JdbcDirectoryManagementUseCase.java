@@ -38,10 +38,18 @@ public class JdbcDirectoryManagementUseCase implements DirectoryManagementUseCas
     @Override
     public DirectoryNodeResponse create(CreateCommand command) {
         long projectId = parseRequiredLong(command.projectId(), "项目标识");
-        long parentDirectoryId = parseRequiredLong(command.parentDirectoryId(), "父目录标识");
         long actorId = parseRequiredLong(command.actorId(), "操作人标识");
         String name = validateDirectoryName(command.name());
-        assertDirectoryBelongsToProject(projectId, parentDirectoryId);
+
+        // 当父目录标识为 "0" 或空时，创建根目录（parent_id 为 NULL）。
+        boolean isRoot = command.parentDirectoryId() == null
+                || command.parentDirectoryId().isBlank()
+                || "0".equals(command.parentDirectoryId());
+        Long parentDirectoryId = isRoot ? null : parseRequiredLong(command.parentDirectoryId(), "父目录标识");
+
+        if (parentDirectoryId != null) {
+            assertDirectoryBelongsToProject(projectId, parentDirectoryId);
+        }
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
         try {
@@ -51,7 +59,11 @@ public class JdbcDirectoryManagementUseCase implements DirectoryManagementUseCas
                         VALUES (?, ?, ?, 'in_progress', ?)
                         """, Statement.RETURN_GENERATED_KEYS);
                 statement.setLong(1, projectId);
-                statement.setLong(2, parentDirectoryId);
+                if (parentDirectoryId != null) {
+                    statement.setLong(2, parentDirectoryId);
+                } else {
+                    statement.setNull(2, java.sql.Types.BIGINT);
+                }
                 statement.setString(3, name);
                 statement.setLong(4, actorId);
                 return statement;
@@ -61,7 +73,8 @@ public class JdbcDirectoryManagementUseCase implements DirectoryManagementUseCas
         }
 
         String directoryId = String.valueOf(Objects.requireNonNull(keyHolder.getKey()).longValue());
-        return new DirectoryNodeResponse(directoryId, String.valueOf(parentDirectoryId), name, "in_progress", List.of(), List.of());
+        String parentIdStr = parentDirectoryId != null ? String.valueOf(parentDirectoryId) : null;
+        return new DirectoryNodeResponse(directoryId, parentIdStr, name, "in_progress", List.of(), List.of());
     }
 
     /**
@@ -76,7 +89,7 @@ public class JdbcDirectoryManagementUseCase implements DirectoryManagementUseCas
         long directoryId = parseRequiredLong(command.directoryId(), "目录标识");
         DirectoryLocation location = findDirectory(projectId, directoryId);
         if (location.parentDirectoryId() == null) {
-            throw new IllegalStateException("默认分工目录不能删除");
+            throw new IllegalStateException("根目录不能删除");
         }
         if (countChildren(directoryId) > 0) {
             throw new IllegalStateException("目录下还有子目录，不能删除");

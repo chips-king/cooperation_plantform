@@ -108,7 +108,7 @@ class RestoreFileUseCaseTest {
      * 创建回收站文件测试样本。
      */
     private FileAsset trashedFile(String id, String name, String directoryId) {
-        FileAsset file = FileAsset.uploaded(id, "project-1", directoryId, FileName.of(name), 1024L, "application/octet-stream", "trash/" + id, "member-1", "version-" + id, 1);
+        FileAsset file = FileAsset.uploaded(id, "project-1", directoryId, FileName.of(name), 1024L, "application/octet-stream", "trash/" + id, "member-1", LocalDateTime.now(), "version-" + id, 1);
         file.moveToTrash("member-1", LocalDateTime.now());
         return file;
     }
@@ -144,6 +144,19 @@ class RestoreFileUseCaseTest {
         @Override
         public List<FileAsset> findTrashedByProjectId(String projectId) {
             return saved.stream().filter(file -> file.projectId().equals(projectId)).filter(file -> file.status() == FileAssetStatus.TRASHED).toList();
+        }
+
+        @Override
+        public int deleteByProjectIdAndStatus(String projectId, FileAssetStatus status) {
+            int[] count = {0};
+            saved.removeIf(file -> {
+                if (file.projectId().equals(projectId) && file.status() == status) {
+                    count[0]++;
+                    return true;
+                }
+                return false;
+            });
+            return count[0];
         }
     }
 
