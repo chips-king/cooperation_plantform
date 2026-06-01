@@ -39,7 +39,10 @@
           :closable="false"
         >
           <p>邀请码：{{ invitation.code }}</p>
-          <p class="group-page__invite-url">{{ invitation.invitationUrl }}</p>
+          <p class="group-page__invite-url">
+            <a :href="frontendInviteUrl" target="_blank">{{ frontendInviteUrl }}</a>
+            <el-button size="small" text @click="copyInviteUrl">复制</el-button>
+          </p>
         </el-alert>
       </section>
     </template>
@@ -177,6 +180,22 @@ const invitationModeOptions = [
   { label: '需要审核', value: 'review' },
 ];
 const groupId = computed(() => Number(route.params.groupId || route.params.id || projectStore.currentGroup?.id || 0));
+
+/** 生成前端邀请链接 */
+const frontendInviteUrl = computed(() => {
+  if (!invitation.value) return '';
+  return `${window.location.origin}/join/${invitation.value.code}`;
+});
+
+/** 复制邀请链接到剪贴板 */
+async function copyInviteUrl(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(frontendInviteUrl.value);
+    ElMessage.success('邀请链接已复制');
+  } catch {
+    ElMessage.warning('复制失败，请手动复制');
+  }
+}
 
 function currentUserId(): number | undefined {
   return authStore.currentUser?.id;

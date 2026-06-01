@@ -22,6 +22,11 @@ logging:
 
 # app 配置系统自定义参数。
 app:
+  # security 配置安全相关参数。
+  security:
+    # aes-key 用于 SMTP 密码加密的 AES-256 密钥（十六进制编码，64 字符），生产环境必须通过环境变量注入。
+    aes-key: ${APP_AES_KEY:}
+
   # file-storage 保存文件存储相关配置。
   file-storage:
     # root 指定上传文件、回收站文件和最终压缩包的根目录，不允许为空。

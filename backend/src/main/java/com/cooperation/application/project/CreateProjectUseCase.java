@@ -6,6 +6,7 @@ import com.cooperation.domain.log.OperationAction;
 import com.cooperation.domain.log.OperationLog;
 import com.cooperation.domain.log.OperationLogRepository;
 import com.cooperation.domain.permission.PermissionCode;
+import com.cooperation.domain.permission.RoleTemplate;
 import com.cooperation.domain.project.Project;
 import com.cooperation.domain.project.ProjectRepository;
 import com.cooperation.domain.project.ProjectStatus;
@@ -59,6 +60,7 @@ public final class CreateProjectUseCase {
         }
 
         Project project = projectRepository.save(Project.create(command.groupId(), command.ownerId(), command.name()));
+        membershipRepository.save(Membership.projectLevel(command.ownerId(), command.groupId(), project.getId(), RoleTemplate.OWNER));
         Instant updatedAt = clock.instant();
         operationLogRepository.save(OperationLog.record(
                 String.valueOf(project.getId()),

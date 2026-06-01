@@ -4,15 +4,18 @@ spring:
     # url 指定 MySQL JDBC 地址，host、port、database 可按本地环境调整。
     url: jdbc:mysql://localhost:3306/cooperation?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     # username 指定业务数据库用户，禁止在生产环境使用 root。
-    username: cooperation_user
+    username: ${SPRING_DATASOURCE_USERNAME:cooperation_user}
     # password 仅为示例占位，实际值不得提交到仓库。
-    password: change_me
+    password: ${SPRING_DATASOURCE_PASSWORD:change_me}
 
 # app 配置系统自定义示例参数。
 app:
+  security:
+    # aes-key 指定 SMTP 密码加密密钥，生产环境必须通过 APP_AES_KEY 注入真实随机值。
+    aes-key: ${APP_AES_KEY:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
   file-storage:
     # root 指定本地文件存储根目录，建议使用项目外可持久化目录。
-    root: ./data/storage
+    root: ${APP_FILE_STORAGE_ROOT:./data/storage}
   mail:
     # provider 指定邮箱服务类型，可选值预留 qq、netease、platform-draft。
     provider: platform-draft

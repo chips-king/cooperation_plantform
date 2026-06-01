@@ -72,10 +72,12 @@ public class DomesticMailProviderAdapter implements MailProviderPort, SendMailDr
      *
      * @param draftId 草稿标识
      * @param draft 草稿实体
+     * @param actorId 操作用户标识
      */
     @Override
-    public void sendDraft(String draftId, MailDraft draft) {
+    public void sendDraft(String draftId, MailDraft draft, String actorId, Long smtpConfigId) {
         requireText(draftId, "草稿标识不能为空");
+        requireText(actorId, "操作用户标识不能为空");
         Objects.requireNonNull(draft, "草稿实体不能为空");
         throw degradedException();
     }

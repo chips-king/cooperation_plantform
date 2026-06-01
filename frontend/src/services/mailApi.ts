@@ -36,6 +36,7 @@ export interface UpdateMailDraftRequest extends CurrentUserRequestOptions {
 export interface SendMailDraftRequest extends CurrentUserRequestOptions {
   draftId: string;
   confirmed: boolean;
+  smtpConfigId?: number;
 }
 
 /**
@@ -118,7 +119,10 @@ export function sendMailDraft(payload: SendMailDraftRequest): Promise<SendMailDr
     url: `/mail-drafts/${payload.draftId}/send`,
     method: 'POST',
     headers: userHeaders(payload.userId),
-    data: { confirmed: payload.confirmed },
+    data: {
+      confirmed: payload.confirmed,
+      smtpConfigId: payload.smtpConfigId ?? null,
+    },
   });
 }
 

@@ -4,6 +4,7 @@ application-local.yml
 
 # === 后端：Maven 构建产物 ===
 backend/target/
+backend/BOOT-INF/
 
 # === 前端：依赖与构建产物 ===
 frontend/node_modules/
@@ -26,3 +27,4 @@ data/
 Thumbs.db
 .DS_Store
 Desktop.ini
+nul

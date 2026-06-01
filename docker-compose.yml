@@ -51,14 +51,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-change_me}
       # APP_FILE_STORAGE_ROOT 指定本地文件存储根目录，所有业务文件都应限制在该目录内。
       APP_FILE_STORAGE_ROOT: ${APP_FILE_STORAGE_ROOT:-/data/cooperation}
-      # APP_FILE_STORAGE_PROJECT_FILES_DIR 指定普通项目文件目录，参与最终打包。
-      APP_FILE_STORAGE_PROJECT_FILES_DIR: ${APP_FILE_STORAGE_PROJECT_FILES_DIR:-/data/cooperation/project-files}
-      # APP_FILE_STORAGE_TRASH_DIR 指定回收站文件目录，不参与最终打包。
-      APP_FILE_STORAGE_TRASH_DIR: ${APP_FILE_STORAGE_TRASH_DIR:-/data/cooperation/trash}
-      # APP_FILE_STORAGE_PACKAGES_DIR 指定最终压缩包目录，仅保留最近一次展示包。
-      APP_FILE_STORAGE_PACKAGES_DIR: ${APP_FILE_STORAGE_PACKAGES_DIR:-/data/cooperation/packages}
-      # APP_FILE_STORAGE_MAIL_ATTACHMENTS_DIR 指定邮件附件引用目录，后续可扩展对象存储。
-      APP_FILE_STORAGE_MAIL_ATTACHMENTS_DIR: ${APP_FILE_STORAGE_MAIL_ATTACHMENTS_DIR:-/data/cooperation/mail-attachments}
+      # APP_AES_KEY 指定 SMTP 密码加密密钥，生产环境必须替换为 64 位十六进制随机值。
+      APP_AES_KEY: ${APP_AES_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
       # MAIL_ENABLED 指定是否启用真实 SMTP 邮件发送，未配置时发送接口会明确返回失败。
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       # MAIL_HOST 指定 SMTP 服务地址，例如 smtp.qq.com 或企业邮箱 SMTP 地址。
@@ -89,12 +83,12 @@ services:
       context: ./frontend
       args:
         # VITE_API_BASE_URL 会在前端构建阶段写入产物，浏览器运行时直接读取。
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:${BACKEND_PORT:-8080}}
     # container_name 指定前端容器名称，便于开发时识别服务。
     container_name: cooperation-frontend
     environment:
       # VITE_API_BASE_URL 指定浏览器访问后端接口的基础地址。
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:${BACKEND_PORT:-8080}}
     ports:
       # 左侧端口可通过 FRONTEND_PORT 调整，右侧 5173 为 Vite 默认预览端口。
       - "${FRONTEND_PORT:-5173}:5173"

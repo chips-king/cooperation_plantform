@@ -159,6 +159,18 @@ export function rejectJoinRequest(payload: RejectJoinRequest): Promise<JoinInvit
 }
 
 /**
+ * 移除项目成员。
+ *
+ * @param membershipId 成员关系标识
+ */
+export function removeMember(membershipId: number): Promise<void> {
+  return request<void>({
+    url: `/memberships/${membershipId}`,
+    method: 'DELETE',
+  });
+}
+
+/**
  * 查询项目成员权限列表。
  *
  * @param projectId 项目标识

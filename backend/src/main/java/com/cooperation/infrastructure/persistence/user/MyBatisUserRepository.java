@@ -64,6 +64,29 @@ public class MyBatisUserRepository implements UserRepository {
     }
 
     /**
+     * 按登录账号查询用户摘要（匹配用户名或邮箱）。
+     *
+     * @param account 登录账号（用户名或邮箱）。
+     * @return 找到时返回用户摘要，否则返回空。
+     */
+    @Override
+    public Optional<UserProfile> findByLoginAccount(String account) {
+        if (account == null || account.isBlank()) {
+            return Optional.empty();
+        }
+        String sql = SELECT_USER_PROFILE + " WHERE username = ? OR email = ?";
+        return jdbcTemplate.query(sql, ps -> {
+            ps.setString(1, account);
+            ps.setString(2, account);
+        }, rs -> {
+            if (!rs.next()) {
+                return Optional.empty();
+            }
+            return Optional.of(toUserProfile(rs));
+        });
+    }
+
+    /**
      * 执行单条用户摘要查询，结果集无记录时返回空。
      *
      * @param sql 带单个查询条件的 SQL。
@@ -77,6 +100,101 @@ public class MyBatisUserRepository implements UserRepository {
             }
             return Optional.of(toUserProfile(rs));
         });
+    }
+
+    /**
+     * 更新用户展示名称和邮箱。
+     *
+     * @param id 用户唯一标识。
+     * @param displayName 新的展示名称。
+     * @param email 新的邮箱。
+     * @return 更新影响行数大于 0 时返回 true。
+     */
+    @Override
+    public boolean updateProfile(Long id, String displayName, String email) {
+        if (id == null) {
+            return false;
+        }
+        int rows = jdbcTemplate.update(
+                "UPDATE users SET display_name = ?, email = ? WHERE id = ?",
+                displayName, email, id
+        );
+        return rows > 0;
+    }
+
+    /**
+     * 查询用户密码哈希值。
+     *
+     * @param id 用户唯一标识。
+     * @return 找到时返回密码哈希值（可能为 null），否则返回空。
+     */
+    @Override
+    public Optional<String> findPasswordHashById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return jdbcTemplate.query(
+                "SELECT password_hash FROM users WHERE id = ?",
+                ps -> ps.setLong(1, id),
+                rs -> {
+                    if (!rs.next()) {
+                        return Optional.empty();
+                    }
+                    return Optional.ofNullable(rs.getString("password_hash"));
+                }
+        );
+    }
+
+    /**
+     * 更新用户密码哈希值。
+     *
+     * @param id 用户唯一标识。
+     * @param passwordHash 新的密码哈希值。
+     * @return 更新影响行数大于 0 时返回 true。
+     */
+    @Override
+    public boolean updatePassword(Long id, String passwordHash) {
+        if (id == null) {
+            return false;
+        }
+        int rows = jdbcTemplate.update(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                passwordHash, id
+        );
+        return rows > 0;
+    }
+
+    /**
+     * 按用户名查询用户摘要。
+     *
+     * @param username 用户名。
+     * @return 找到时返回用户摘要，否则返回空。
+     */
+    @Override
+    public Optional<UserProfile> findByUsername(String username) {
+        if (username == null || username.isBlank()) {
+            return Optional.empty();
+        }
+        return queryOne(SELECT_USER_PROFILE + " WHERE username = ?", username);
+    }
+
+    /**
+     * 创建新用户并返回创建后的用户摘要。
+     *
+     * @param username 登录用户名。
+     * @param displayName 展示名称。
+     * @param email 邮箱。
+     * @param passwordHash 密码哈希值。
+     * @return 创建成功时返回新用户摘要。
+     */
+    @Override
+    public Optional<UserProfile> createUser(String username, String displayName, String email, String passwordHash) {
+        jdbcTemplate.update(
+                "INSERT INTO users (username, display_name, email, password_hash, status) VALUES (?, ?, ?, ?, 'active')",
+                username, displayName, email, passwordHash
+        );
+        // 查询刚创建的用户并返回
+        return findByUsername(username);
     }
 
     /**

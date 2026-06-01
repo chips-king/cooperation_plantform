@@ -47,12 +47,13 @@ class SendMailDraftUseCaseTest {
                 fixedClock
         );
 
-        SendMailDraftUseCase.Result result = useCase.handle(new SendMailDraftUseCase.Command("draft-1", "owner-1", true));
+        SendMailDraftUseCase.Result result = useCase.handle(new SendMailDraftUseCase.Command("draft-1", "owner-1", true, null));
 
         assertEquals(MailDraftStatus.SENT, result.draft().getStatus());
         assertEquals(fixedClock.instant(), draftRepository.savedDraft.getSentAt());
         assertEquals("邮件发送成功", result.message());
         assertEquals("draft-1", mailProviderPort.sentDraftIds.get(0));
+        assertEquals("owner-1", mailProviderPort.sentActorIds.get(0));
         assertEquals(OperationAction.MAIL_SENT, logWriter.records.get(0).action());
         assertEquals(NotificationEventType.MAIL_SENT, notificationPublisher.events.get(0).type());
     }
@@ -81,7 +82,7 @@ class SendMailDraftUseCaseTest {
                 fixedClock
         );
 
-        assertThrows(IllegalStateException.class, () -> useCase.handle(new SendMailDraftUseCase.Command("draft-1", "owner-1", true)));
+        assertThrows(IllegalStateException.class, () -> useCase.handle(new SendMailDraftUseCase.Command("draft-1", "owner-1", true, null)));
         assertEquals(MailDraftStatus.DRAFT, draftRepository.savedDraft.getStatus());
         assertEquals("邮箱服务暂不可用", draftRepository.savedDraft.getLastFailureReason());
     }
@@ -109,7 +110,7 @@ class SendMailDraftUseCaseTest {
                 fixedClock
         );
 
-        assertThrows(IllegalStateException.class, () -> useCase.handle(new SendMailDraftUseCase.Command("draft-1", "owner-1", false)));
+        assertThrows(IllegalStateException.class, () -> useCase.handle(new SendMailDraftUseCase.Command("draft-1", "owner-1", false, null)));
         assertEquals(List.of(), mailProviderPort.sentDraftIds);
         assertEquals(MailDraftStatus.DRAFT, draftRepository.savedDraft.getStatus());
     }
@@ -149,14 +150,16 @@ class SendMailDraftUseCaseTest {
      */
     private static final class FakeMailProviderPort implements SendMailDraftUseCase.MailProviderPort {
         private final List<String> sentDraftIds = new ArrayList<>();
+        private final List<String> sentActorIds = new ArrayList<>();
         private String failureReason;
 
         @Override
-        public void sendDraft(String draftId, MailDraft draft) {
+        public void sendDraft(String draftId, MailDraft draft, String actorId, Long smtpConfigId) {
             if (failureReason != null) {
                 throw new IllegalStateException(failureReason);
             }
             sentDraftIds.add(draftId);
+            sentActorIds.add(actorId);
         }
     }
 

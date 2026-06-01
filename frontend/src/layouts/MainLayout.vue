@@ -102,6 +102,24 @@
             </el-badge>
             <Bell v-else class="main-header__notice-icon" />
           </RouterLink>
+          <el-dropdown trigger="click" @command="handleUserCommand">
+            <button class="main-header__user-btn" :title="authStore.currentUser?.displayName ?? '用户'">
+              <UserFilled class="main-header__user-icon" />
+              <span class="main-header__user-name">{{ authStore.currentUser?.displayName ?? '用户' }}</span>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">
+                  <el-icon><UserFilled /></el-icon>
+                  个人中心
+                </el-dropdown-item>
+                <el-dropdown-item divided command="logout">
+                  <el-icon><SwitchButton /></el-icon>
+                  退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </header>
 
@@ -120,7 +138,8 @@ import {
   Bell,
   HomeFilled,
   Message,
-  TrendCharts,
+  SwitchButton,
+  UserFilled,
 } from '@element-plus/icons-vue';
 import { listNotifications } from '@/services/activityApi';
 import { useAuthStore } from '@/stores/auth';
@@ -171,11 +190,11 @@ const titleMap: Record<string, string> = {
   home: '项目总览',
   'group-detail': '小组详情',
   'project-workspace': '项目工作台',
-  'project-progress': '任务进度',
   'mail-draft': '邮件草稿',
   'mail-draft-overview': '邮件草稿',
   'operation-logs': '操作记录',
   notifications: '通知中心',
+  profile: '个人中心',
 };
 
 const pageTitle = computed(() => titleMap[String(route.name ?? '')] || '工作台');
@@ -191,7 +210,6 @@ const projectNav = computed<NavItem[]>(() => {
   if (!pid) return [];
   return [
     { to: `/projects/${pid}`, label: '工作台', icon: HomeFilled },
-    { to: `/projects/${pid}/progress`, label: '任务进度', icon: TrendCharts },
   ];
 });
 
@@ -201,13 +219,13 @@ const backRouteMap: Record<
 > = {
   'group-detail': '/',
   'project-workspace': '/',
-  'project-progress': (p) => `/projects/${p.projectId}`,
   'package-check': (p) => `/projects/${p.projectId}`,
   'package-export': (p) => `/projects/${p.projectId}`,
   'mail-draft': '/mail-drafts',
   'mail-draft-overview': '/',
   'operation-logs': (p) => `/projects/${p.projectId}`,
   notifications: '/',
+  profile: '/',
 };
 
 const canGoBack = computed(() => {
@@ -234,6 +252,20 @@ function goBack(): void {
     void router.push(target);
   } else {
     router.back();
+  }
+}
+
+/**
+ * 处理顶部用户下拉菜单命令：进入个人中心或退出登录。
+ *
+ * @param command 下拉菜单命令标识
+ */
+function handleUserCommand(command: string): void {
+  if (command === 'profile') {
+    void router.push('/profile');
+  } else if (command === 'logout') {
+    authStore.clearSession();
+    void router.push('/login');
   }
 }
 </script>
@@ -328,6 +360,38 @@ function goBack(): void {
 .main-header__notice-icon {
   width: 18px;
   height: 18px;
+}
+
+/* 用户入口按钮 */
+.main-header__user-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cb-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.main-header__user-btn:hover {
+  background: var(--cb-bg-page);
+  color: var(--cb-text-primary);
+}
+
+.main-header__user-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.main-header__user-name {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 内容区 */

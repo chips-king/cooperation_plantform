@@ -55,6 +55,18 @@ cd cooperation
 
 项目里有一个 `.env.example` 文件，这是一个"配置模板"。你需要复制一份，改名为 `.env`：
 
+**推荐：运行配置向导**
+
+如果你想通过向导生成 Docker 环境配置，可以运行：
+
+```powershell
+.\scripts\init-env.ps1
+```
+
+脚本会自动生成 `.env`，依次询问数据库业务用户名、业务密码、MySQL root 密码、MySQL 端口、后端端口和前端端口，并自动生成 `APP_AES_KEY`。如果端口已被占用，脚本会提醒你确认是否继续使用。SMTP 默认不配置，后续可在系统个人中心里添加。
+
+**手动复制模板**
+
 **Windows (PowerShell)：**
 ```powershell
 copy .env.example .env
@@ -68,6 +80,16 @@ cp .env.example .env
 > `.env` 文件里存的是数据库密码、邮箱密码等敏感信息。这个文件已经被 git 忽略了，不会上传到 GitHub，所以你可以放心填写。
 
 如果你只是想本地试试，`.env` 文件里的内容**不用修改**，默认值就能跑起来。但如果你要部署到服务器上，记得把里面的 `change_me` 和 `change_root_me` 改成你自己的强密码。
+
+### 配置应该写在哪里
+
+| 使用方式 | 配置文件 | 说明 |
+|---|---|---|
+| Docker Compose 一键启动 | `.env` | 数据库账号密码、端口、`APP_AES_KEY`、SMTP 等环境变量都写这里 |
+| 本地手动启动后端 | `backend/src/main/resources/application-local.yml` | 只在不使用 Docker、直接运行 Spring Boot 时使用 |
+| 配置模板 | `.env.example`、`application-local.example.yml` | 只放占位值和说明，不填写真实密码 |
+
+> 推荐默认使用 Docker Compose：复制 `.env.example` 为 `.env` 后，只改 `.env`。不要把真实密码、邮箱授权码或生产配置写进 `application.yml`、`.env.example` 或源码。
 
 ### 第三步：一键启动
 
@@ -106,12 +128,15 @@ cooperation-frontend | VITE v5.x.x  ready in 350 ms
 ### 核心功能
 
 - **小组管理**：创建小组、邀请成员、管理成员权限
-- **项目管理**：创建项目、设置目录结构、管理项目状态
-- **文件管理**：上传、下载、移动、重命名、删除文件
+- **账号与个人中心**：注册、登录、维护个人资料、修改密码
+- **项目管理**：创建项目、查看项目、删除项目、管理项目状态
+- **文件管理**：上传、下载、移动、删除文件、文件评论
 - **目录管理**：创建、删除目录，设置目录状态
+- **回收站**：查看、恢复和清空项目回收站
 - **进度追踪**：查看项目完成进度、目录状态统计
 - **打包导出**：打包前检查、清理建议、导出压缩包
-- **邮件草稿**：生成邮件草稿、发送邮件
+- **邮件草稿**：生成邮件草稿、编辑草稿、选择 SMTP 配置发送邮件
+- **邮件设置**：在个人中心维护 SMTP/IMAP 配置、发送测试邮件、设置默认发件配置
 - **操作记录**：查看所有操作历史
 - **通知系统**：接收平台内通知
 
@@ -121,15 +146,17 @@ cooperation-frontend | VITE v5.x.x  ready in 350 ms
 |---|---|---|
 | 项目总览 | `/` | 显示所有项目卡片，可创建小组和项目 |
 | 登录 | `/login` | 用户登录 |
+| 注册 | `/register` | 创建新用户账号 |
+| 个人中心 | `/profile` | 维护个人资料、密码和邮件配置 |
 | 小组详情 | `/groups/:groupId` | 查看小组信息和成员 |
 | 项目工作台 | `/projects/:projectId` | 项目文件管理、目录操作 |
-| 任务进度 | `/projects/:projectId/progress` | 查看项目完成进度 |
 | 打包检查 | `/projects/:projectId/package/check` | 打包前检查问题 |
 | 打包导出 | `/projects/:projectId/package/export` | 导出压缩包 |
 | 邮件草稿 | `/projects/:projectId/mail` | 生成和发送邮件 |
 | 操作记录 | `/projects/:projectId/logs` | 查看操作历史 |
 | 通知 | `/notifications` | 查看通知消息 |
 | 邮件总览 | `/mail-drafts` | 查看所有邮件草稿 |
+| 邀请加入 | `/join/:code` | 通过邀请链接加入项目 |
 
 ---
 
@@ -238,6 +265,7 @@ npm run test:e2e       # E2E 测试（需要先装 Playwright 浏览器）
 MYSQL_PORT=3307
 BACKEND_PORT=8081
 FRONTEND_PORT=5174
+VITE_API_BASE_URL=http://localhost:8081
 ```
 
 然后重新启动。
@@ -311,4 +339,4 @@ npm config set registry https://registry.npmmirror.com
 
 ---
 
-最后更新时间：2026-05-28 17:30:00
+最后更新时间：2026-06-01 21:56:56

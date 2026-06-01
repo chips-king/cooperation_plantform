@@ -13,30 +13,25 @@
     </template>
 
     <template #aside>
-      <template v-if="isProjectView">
-        <el-descriptions :column="1" size="small" border>
-          <el-descriptions-item label="当前项目">
-            {{ projectName }}
-          </el-descriptions-item>
-          <el-descriptions-item label="附件">
-            {{ latestPackage?.filename ?? draft?.attachmentFilename ?? '暂无' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="草稿状态">
-            {{ draftStatusText }}
-          </el-descriptions-item>
-        </el-descriptions>
-      </template>
+      <nav class="mail-aside">
+        <div class="mail-aside__label">可发邮件的项目</div>
+        <div v-if="summaries.length === 0" class="mail-aside__empty">暂无项目</div>
+        <a
+          v-for="item in summaries"
+          :key="item.projectId"
+          class="mail-aside__link"
+          href="#"
+          @click.prevent="openProjectDrafts(item.projectId, item.projectName)"
+        >
+          <span class="mail-aside__link-name">{{ item.projectName }}</span>
+          <el-badge v-if="item.draftCount > 0" :value="item.draftCount" :max="99" type="primary" />
+          <el-tag v-else type="warning" size="small" effect="plain">待生成</el-tag>
+        </a>
+      </nav>
     </template>
 
     <!-- 第一层：项目列表概览（含已打包未建草稿的项目） -->
     <section v-if="!isProjectView" class="mail-overview">
-      <div class="mail-overview__header">
-        <h2 class="mail-overview__title">可发邮件的项目</h2>
-        <el-button :loading="loadingSummaries" text @click="loadSummaries">
-          <el-icon><Refresh /></el-icon>
-        </el-button>
-      </div>
-
       <el-empty v-if="!loadingSummaries && summaries.length === 0">
         <template #description>
           <p>暂无已打包项目或邮件草稿</p>
@@ -87,6 +82,26 @@
         title="当前项目已有打包文件，填写收件人和主题后即可发送邮件。"
         type="success"
       />
+
+      <!-- 项目状态摘要信息条 -->
+      <div class="mail-project__status-bar">
+        <span class="mail-project__status-item">
+          <span class="mail-project__status-label">当前项目</span>
+          <span class="mail-project__status-value">{{ projectName }}</span>
+        </span>
+        <el-divider direction="vertical" />
+        <span class="mail-project__status-item">
+          <span class="mail-project__status-label">附件</span>
+          <span class="mail-project__status-value">{{ latestPackage?.filename ?? draft?.attachmentFilename ?? '暂无' }}</span>
+        </span>
+        <el-divider direction="vertical" />
+        <span class="mail-project__status-item">
+          <span class="mail-project__status-label">草稿状态</span>
+          <el-tag :type="draftStatusText === '已发送' ? 'success' : draftStatusText === '草稿' ? 'warning' : 'info'" size="small">
+            {{ draftStatusText }}
+          </el-tag>
+        </span>
+      </div>
 
       <!-- 左右分栏布局 -->
       <div class="mail-project__content">
@@ -154,6 +169,17 @@
                 <el-tag v-else type="warning">请先生成最终压缩包</el-tag>
               </el-form-item>
 
+              <el-form-item v-if="smtpConfigs.length > 0" label="发送邮箱">
+                <el-select v-model="selectedSmtpConfigId" placeholder="选择 SMTP 配置" style="width: 100%">
+                  <el-option
+                    v-for="config in smtpConfigs"
+                    :key="config.id"
+                    :label="`${config.name} (${config.fromAddress})`"
+                    :value="config.id"
+                  />
+                </el-select>
+              </el-form-item>
+
               <el-form-item>
                 <el-button :icon="DocumentAdd" :loading="saving" type="primary" @click="handleSaveDraft">
                   暂时保存
@@ -187,11 +213,13 @@ import {
   updateMailDraft,
 } from '@/services/mailApi';
 import { getLatestPackage } from '@/services/packageApi';
+import { listSmtpConfigs } from '@/services/smtpConfigApi';
 import { getProject } from '@/services/groupProjectApi';
 import { useAuthStore } from '@/stores/auth';
 import { useProjectStore } from '@/stores/project';
 
 import type { DraftSummary, MailDraft, PackageArtifact, PackageFormat, Project, ProjectDraftListItem } from '@/types/project';
+import type { SmtpConfig } from '@/services/smtpConfigApi';
 
 const route = useRoute();
 const router = useRouter();
@@ -205,6 +233,8 @@ const loadingLatest = ref(false);
 const loadingSummaries = ref(false);
 const loadingProjectDrafts = ref(false);
 const deletingDraftId = ref<string | null>(null);
+const smtpConfigs = ref<SmtpConfig[]>([]);
+const selectedSmtpConfigId = ref<number | null>(null);
 const draft = ref<MailDraft | null>(null);
 const latestPackage = ref<PackageArtifact | null>(null);
 const summaries = ref<DraftSummary[]>([]);
@@ -473,6 +503,7 @@ async function handleSendDraft(): Promise<void> {
       draftId: draft.value.draftId,
       userId: authStore.currentUser?.id,
       confirmed: true,
+      smtpConfigId: selectedSmtpConfigId.value ?? undefined,
     });
     draft.value = result;
     ElMessage.success(result.message || '邮件已发送');
@@ -557,28 +588,72 @@ function handleRouteChange(): void {
 watch(() => route.name, handleRouteChange);
 watch(() => route.params.projectId, handleRouteChange);
 
-onMounted(handleRouteChange);
+onMounted(() => {
+  handleRouteChange();
+  void loadSmtpConfigs();
+});
+
+async function loadSmtpConfigs(): Promise<void> {
+  try {
+    smtpConfigs.value = await listSmtpConfigs();
+    const defaultConfig = smtpConfigs.value.find(c => c.isDefault);
+    if (defaultConfig) {
+      selectedSmtpConfigId.value = defaultConfig.id;
+    } else if (smtpConfigs.value.length > 0) {
+      selectedSmtpConfigId.value = smtpConfigs.value[0].id;
+    }
+  } catch {
+    smtpConfigs.value = [];
+  }
+}
 </script>
 
 <style scoped>
+/* ---- 侧边栏 ---- */
+.mail-aside__label {
+  padding: 0 0 8px;
+  color: #6b6b8a;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.mail-aside__empty {
+  padding: 12px 0;
+  color: #9e9eb8;
+  font-size: 13px;
+}
+
+.mail-aside__link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 2px;
+  border-radius: 6px;
+  color: #9e9eb8;
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.1s, color 0.1s;
+}
+
+.mail-aside__link:hover {
+  color: #e8e8f0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mail-aside__link-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- 概览视图（第一层） ---- */
 .mail-overview {
   display: grid;
   gap: 16px;
-  max-width: 960px;
-  margin: 0 auto;
-}
-
-.mail-overview__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.mail-overview__title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
 }
 
 .mail-overview__empty-hint {
@@ -595,9 +670,8 @@ onMounted(handleRouteChange);
 
 .mail-overview__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
-  justify-content: center;
 }
 
 .mail-overview__card {
@@ -646,6 +720,34 @@ onMounted(handleRouteChange);
   display: grid;
   gap: 18px;
   max-width: 1200px;
+}
+
+/* 项目状态摘要信息条 */
+.mail-project__status-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: var(--cb-bg-card);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius-md);
+  font-size: 13px;
+  color: var(--cb-text-secondary);
+}
+
+.mail-project__status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mail-project__status-label {
+  color: var(--cb-text-muted);
+}
+
+.mail-project__status-value {
+  color: var(--cb-text-primary);
+  font-weight: 500;
 }
 
 .mail-project__nav {

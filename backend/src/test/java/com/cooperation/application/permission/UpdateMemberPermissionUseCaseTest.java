@@ -122,6 +122,17 @@ class UpdateMemberPermissionUseCaseTest {
         }
 
         @Override
+        public void deleteById(Long id) {
+        }
+
+        @Override
+        public List<Membership> findByProjectId(Long projectId) {
+            return memberships.stream()
+                    .filter(membership -> membership.getProjectId().map(projectId::equals).orElse(false))
+                    .toList();
+        }
+
+        @Override
         public void deleteByGroupId(Long groupId) {
         }
 

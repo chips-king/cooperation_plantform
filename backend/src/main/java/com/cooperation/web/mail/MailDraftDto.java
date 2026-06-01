@@ -52,8 +52,12 @@ public final class MailDraftDto {
      * 发送邮件草稿请求。
      *
      * @param confirmed 是否已确认发送
+     * @param smtpConfigId SMTP 配置标识，为空时使用默认配置
      */
-    public record SendMailDraftRequest(@NotNull(message = "发送确认不能为空") Boolean confirmed) {
+    public record SendMailDraftRequest(
+            @NotNull(message = "发送确认不能为空") Boolean confirmed,
+            Long smtpConfigId
+    ) {
     }
 
     /**

@@ -92,6 +92,15 @@ describe('ProjectWorkspacePage', () => {
     expect(wrapper.text()).toContain('此项目还没有文件');
   });
 
+  it('不再展示任务进度快捷入口', async () => {
+    const wrapper = mountProjectWorkspacePage();
+
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('任务进度');
+    expect(wrapper.find('a[href="/projects/1/progress"]').exists()).toBe(false);
+  });
+
   it('项目有目录时展示目录列表', async () => {
     // 模拟有根目录和子目录的项目
     mockedGetDirectoryTree.mockResolvedValue({

@@ -1,5 +1,6 @@
 package com.cooperation.application.member;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -44,11 +45,26 @@ public interface MembershipRepository {
     Optional<Membership> findByProjectIdAndUserId(Long projectId, Long userId);
 
     /**
+     * 按成员关系标识删除成员关系。
+     *
+     * @param id 成员关系标识。
+     */
+    void deleteById(Long id);
+
+    /**
      * 按小组标识删除所有成员关系。
      *
      * @param groupId 小组标识。
      */
     void deleteByGroupId(Long groupId);
+
+    /**
+     * 按项目标识查询所有成员关系。
+     *
+     * @param projectId 项目标识。
+     * @return 该项目的成员关系列表。
+     */
+    List<Membership> findByProjectId(Long projectId);
 
     /**
      * 按项目标识删除所有成员关系。

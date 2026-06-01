@@ -148,7 +148,7 @@ public class MailDraftController {
             throw new IllegalStateException("发送邮件前必须确认");
         }
         SendMailDraftUseCase.Result result = sendMailDraftUseCase.handle(
-                new SendMailDraftUseCase.Command(draftId, actorId, true)
+                new SendMailDraftUseCase.Command(draftId, actorId, true, request.smtpConfigId())
         );
         return ApiResponse.success(MailDraftDto.SendMailDraftResponse.from(
                 draftId,

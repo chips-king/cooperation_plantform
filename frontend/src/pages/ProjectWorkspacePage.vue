@@ -20,7 +20,6 @@
     <template #aside>
       <section class="workspace-page__aside">
         <h2>快捷入口</h2>
-        <RouterLink class="workspace-page__aside-link" :to="`/projects/${projectId}/progress`">任务进度</RouterLink>
         <RouterLink class="workspace-page__aside-link" :to="`/projects/${projectId}/mail`">邮件草稿</RouterLink>
       </section>
     </template>
@@ -77,23 +76,46 @@
         @delete-directory="handleDeleteSingleDirectory"
       />
 
-      <!-- 最近操作 -->
-      <section class="workspace-page__recent">
-        <div class="workspace-page__recent-header">
-          <span class="workspace-page__recent-title">最近操作</span>
-          <RouterLink class="workspace-page__text-link" :to="`/projects/${projectId}/logs`">查看全部</RouterLink>
+      <!-- 小组成员 -->
+      <section class="workspace-page__members">
+        <div class="workspace-page__members-header">
+          <span class="workspace-page__members-title">小组成员</span>
+          <el-button size="small" type="primary" :icon="Link" @click="handleCreateInvitation">
+            邀请加入
+          </el-button>
         </div>
-        <div v-if="logs.length > 0" class="workspace-page__recent-list">
-          <div v-for="log in logs.slice(0, 5)" :key="log.id" class="workspace-page__recent-item">
-            <div class="workspace-page__recent-dot" />
-            <div class="workspace-page__recent-content">
-              <span class="workspace-page__recent-action">{{ actionLabel(log.action) }}</span>
-              <span class="workspace-page__recent-summary">{{ log.summary }}</span>
-              <span class="workspace-page__recent-time">{{ formatDate(log.createdAt) }}</span>
+        <div v-if="members.length > 0" class="workspace-page__members-list">
+          <div v-for="member in members" :key="member.membershipId" class="workspace-page__member-item">
+            <div class="workspace-page__member-avatar">{{ member.userName.charAt(0) }}</div>
+            <div class="workspace-page__member-info">
+              <span class="workspace-page__member-name">{{ member.userName }}</span>
+              <el-tag :type="roleTagType(member.roleTemplate)" size="small" effect="plain">
+                {{ roleLabel(member.roleTemplate) }}
+              </el-tag>
             </div>
+            <el-button
+              v-if="member.roleTemplate !== 'OWNER'"
+              size="small"
+              text
+              type="danger"
+              class="workspace-page__member-remove"
+              @click="handleRemoveMember(member)"
+            >
+              移除
+            </el-button>
           </div>
         </div>
-        <el-empty v-else description="暂无操作记录" :image-size="64" />
+        <el-empty v-else description="暂无成员" :image-size="48" />
+
+        <!-- 邀请链接弹窗 -->
+        <el-dialog v-model="inviteDialogVisible" title="邀请链接" width="420px">
+          <p style="margin: 0 0 12px; color: #687386; font-size: 13px;">将以下链接分享给他人，即可加入本项目。</p>
+          <el-input :model-value="inviteUrl" readonly>
+            <template #append>
+              <el-button @click="copyInviteUrl">复制</el-button>
+            </template>
+          </el-input>
+        </el-dialog>
       </section>
     </section>
 
@@ -130,12 +152,13 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Box, Delete, Document, FolderOpened, Refresh } from '@element-plus/icons-vue';
+import { Box, Delete, Document, FolderOpened, Link, Refresh } from '@element-plus/icons-vue';
 
 import FileListBlock from '@/components/project/FileListBlock.vue';
 import MainLayout from '@/layouts/MainLayout.vue';
 import PackageCommandDialog from '@/components/project/PackageCommandDialog.vue';
 import { deleteProject, getProject } from '@/services/groupProjectApi';
+import { createInvitation, getProjectPermissions, removeMember } from '@/services/memberPermissionApi';
 import { listOperationLogs } from '@/services/activityApi';
 import { createDirectory, deleteDirectory, deleteFile, downloadFile, getDirectoryTree, uploadFile } from '@/services/fileApi';
 import { useAuthStore } from '@/stores/auth';
@@ -144,6 +167,8 @@ import type {
   Directory,
   DirectoryStatus,
   FileAsset,
+  Invitation,
+  MemberPermission,
   OperationLog,
   Project,
   ProjectProgress,
@@ -164,6 +189,9 @@ const directoryDialogVisible = ref(false);
 const directoryFormName = ref('');
 const creatingDirectory = ref(false);
 const packageDialogVisible = ref(false);
+const members = ref<MemberPermission[]>([]);
+const inviteDialogVisible = ref(false);
+const inviteUrl = ref('');
 /** FileListBlock 组件引用，用于调用 runUpload */
 const fileListBlockRef = ref<InstanceType<typeof FileListBlock> | null>(null);
 
@@ -241,6 +269,62 @@ function formatDate(value?: string | null): string {
   const diffDay = Math.floor(diffHour / 24);
   if (diffDay < 7) return `${diffDay} 天前`;
   return d.toLocaleDateString('zh-CN');
+}
+
+function roleLabel(role: string): string {
+  const map: Record<string, string> = { OWNER: '负责人', MEMBER: '成员', READ_ONLY: '只读' };
+  return map[role] ?? role;
+}
+
+function roleTagType(role: string): '' | 'success' | 'warning' | 'info' {
+  if (role === 'OWNER') return '';
+  if (role === 'MEMBER') return 'success';
+  return 'info';
+}
+
+async function handleCreateInvitation(): Promise<void> {
+  if (!project.value) return;
+  try {
+    const result = await createInvitation({
+      groupId: project.value.groupId,
+      projectId: numericProjectId.value,
+      mode: 'direct',
+      roleTemplate: 'MEMBER',
+      userId: currentUserId(),
+    });
+    inviteUrl.value = `${window.location.origin}/join/${result.code}`;
+    inviteDialogVisible.value = true;
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '创建邀请失败');
+  }
+}
+
+async function copyInviteUrl(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(inviteUrl.value);
+    ElMessage.success('邀请链接已复制');
+  } catch {
+    ElMessage.warning('复制失败，请手动复制');
+  }
+}
+
+async function handleRemoveMember(member: MemberPermission): Promise<void> {
+  try {
+    await ElMessageBox.confirm(`确认将「${member.userName}」从项目中移除？`, '移除成员', {
+      type: 'warning',
+      confirmButtonText: '确认移除',
+      cancelButtonText: '取消',
+    });
+  } catch {
+    return;
+  }
+  try {
+    await removeMember(member.membershipId);
+    ElMessage.success('成员已移除');
+    members.value = members.value.filter((m) => m.membershipId !== member.membershipId);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '移除失败');
+  }
 }
 
 /**
@@ -442,13 +526,15 @@ async function loadWorkspace(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    const [projectDetail, logList] = await Promise.all([
+    const [projectDetail, logList, permResponse] = await Promise.all([
       getProject(numericProjectId.value, { userId: currentUserId() }),
       listOperationLogs(projectId.value, { userId: currentUserId() }).catch(() => ({ logs: [] })),
+      getProjectPermissions(numericProjectId.value, { userId: currentUserId() }).catch(() => ({ projectId: numericProjectId.value, members: [] })),
     ]);
     project.value = projectDetail;
     projectStore.setCurrentProject(projectDetail);
     logs.value = logList.logs;
+    members.value = permResponse.members;
     await loadDirectoryTree();
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '项目工作台加载失败';
@@ -558,15 +644,15 @@ onMounted(loadWorkspace);
   background: #eef3f8;
 }
 
-/* ---- 最近操作 ---- */
-.workspace-page__recent {
+/* ---- 小组成员 ---- */
+.workspace-page__members {
   background: var(--cb-bg-card);
   border: 1px solid var(--cb-border);
   border-radius: var(--cb-radius-md);
   overflow: hidden;
 }
 
-.workspace-page__recent-header {
+.workspace-page__members-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -575,67 +661,62 @@ onMounted(loadWorkspace);
   border-bottom: 1px solid var(--cb-border-light);
 }
 
-.workspace-page__recent-title {
+.workspace-page__members-title {
   font-weight: 600;
   font-size: 14px;
 }
 
-.workspace-page__text-link {
-  color: #1d4f91;
-  font-weight: 600;
-  text-decoration: none;
-  font-size: 13px;
-}
-
-.workspace-page__recent-list {
+.workspace-page__members-list {
   padding: 0;
 }
 
-.workspace-page__recent-item {
+.workspace-page__member-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   padding: 12px 18px;
   border-bottom: 1px solid var(--cb-border-light);
 }
 
-.workspace-page__recent-item:last-child {
+.workspace-page__member-item:last-child {
   border-bottom: none;
 }
 
-.workspace-page__recent-dot {
-  width: 8px;
-  height: 8px;
+.workspace-page__member-avatar {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: var(--cb-color-primary);
-  margin-top: 6px;
+  background: #e8f0f9;
+  color: #1d4f91;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
-.workspace-page__recent-content {
+.workspace-page__member-info {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+  flex: 1;
 }
 
-.workspace-page__recent-action {
-  font-weight: 600;
-  font-size: 13px;
+.workspace-page__member-name {
+  font-size: 14px;
+  font-weight: 500;
   color: var(--cb-text-primary);
 }
 
-.workspace-page__recent-summary {
-  font-size: 13px;
-  color: var(--cb-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.workspace-page__member-remove {
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
-.workspace-page__recent-time {
-  font-size: 12px;
-  color: var(--cb-text-muted);
+.workspace-page__member-item:hover .workspace-page__member-remove {
+  opacity: 1;
 }
 
 @media (max-width: 768px) {

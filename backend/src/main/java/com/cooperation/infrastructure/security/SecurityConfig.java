@@ -9,6 +9,7 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -52,6 +53,7 @@ public class SecurityConfig {
                         // 健康检查、静态资源和错误响应不需要登录，避免探活或 404 被改写成认证失败。
                         .requestMatchers(
                                 "/auth/login",
+                                "/auth/register",
                                 "/actuator/health",
                                 "/favicon.ico",
                                 "/css/**",
@@ -60,6 +62,7 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/error"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/invitations/*").permitAll()
                         .anyRequest().authenticated()
                 )
                 // 识别开发期登录接口返回的 Bearer 令牌，让前端登录后可直接访问受保护 API。

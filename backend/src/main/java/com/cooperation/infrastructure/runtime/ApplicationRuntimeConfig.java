@@ -2,7 +2,6 @@ package com.cooperation.infrastructure.runtime;
 
 import com.cooperation.application.directory.DirectoryLookupPort;
 import com.cooperation.application.directory.DirectoryRepository;
-import com.cooperation.application.directory.ListProjectProgressUseCase;
 import com.cooperation.application.directory.UpdateDirectoryStatusUseCase;
 import com.cooperation.application.file.DeleteFileUseCase;
 import com.cooperation.application.file.DownloadFileUseCase;
@@ -76,7 +75,6 @@ import com.cooperation.web.file.FileDto;
 import com.cooperation.web.group.GroupDto;
 import com.cooperation.web.mail.MailDraftDto;
 import com.cooperation.web.mail.MailDraftListPort;
-import com.cooperation.web.progress.ProgressDto;
 import com.cooperation.web.project.ProjectDto;
 import java.time.Clock;
 import java.time.Instant;
@@ -531,27 +529,7 @@ public class ApplicationRuntimeConfig {
         };
     }
 
-    /**
-     * 查询项目进度。
-     */
-    @Bean
-    @ConditionalOnMissingBean
-    public ListProjectProgressUseCase listProjectProgressUseCase() {
-        return projectId -> new ProgressDto.ProjectProgressResponse(
-                projectId,
-                1,
-                0,
-                List.of(new ProgressDto.DirectoryProgressResponse(
-                        DEFAULT_DIRECTORY_ID,
-                        DEFAULT_DIRECTORY_NAME,
-                        DirectoryStatus.IN_PROGRESS.getValue(),
-                        DirectoryStatus.IN_PROGRESS.getDisplayName(),
-                        Instant.now(),
-                        0,
-                        false
-                ))
-        );
-    }
+    // ListProjectProgressUseCase 已迁移到 JdbcDeploymentConfig（JDBC 实现），不再使用内存 stub
 
     /**
      * 查询项目详情。
@@ -1006,6 +984,18 @@ public class ApplicationRuntimeConfig {
         }
 
         @Override
+        public void deleteById(Long id) {
+            memberships.remove(id);
+        }
+
+        @Override
+        public List<Membership> findByProjectId(Long projectId) {
+            return memberships.values().stream()
+                    .filter(membership -> membership.getProjectId().map(projectId::equals).orElse(false))
+                    .toList();
+        }
+
+        @Override
         public void deleteByGroupId(Long groupId) {
             memberships.values().removeIf(membership -> Objects.equals(membership.getGroupId(), groupId));
         }
@@ -1092,7 +1082,7 @@ public class ApplicationRuntimeConfig {
         }
 
         @Override
-        public void sendDraft(String draftId, MailDraft draft) {
+        public void sendDraft(String draftId, MailDraft draft, String actorId, Long smtpConfigId) {
             throw new IllegalStateException("邮箱服务未配置，无法发送邮件，请先配置邮箱服务或人工下载附件发送");
         }
 

@@ -1546,11 +1546,63 @@
 F001 -> D001-D013 -> D014-D036 -> A001-A019 -> A020-A043 -> W001-W011 -> W012-W033 -> I001-I025 -> U001-U032
 ```
 
-最后生成时间：2026-05-26 15:03:52
-
 ## Phase 7: 小组删除补充
 
 目标：实现小组负责人删除小组（仅限无项目时），包括后端用例、接口和前端按钮。
 
 按 AGENTS.md 执行顺序：先 Domain/Repository 变更 → Application UseCase → Web API → Frontend。
+
+## Phase 8: 当前能力补充与文档对齐
+
+目标：整理 2026-06-01 已澄清或已进入代码的能力，作为后续接口整理、测试补齐和页面完善的任务入口。
+
+### Phase 8 / C001 整理账号注册登录能力
+
+- 目标文件：`backend/src/main/java/com/cooperation/web/auth/AuthController.java`、`frontend/src/pages/LoginPage.vue`、`frontend/src/pages/RegisterPage.vue`
+- 内容：保持注册、登录、权限摘要、开发阶段令牌和前端会话写入逻辑一致。
+- 验收：登录和注册成功后均能进入受保护页面，密码不写入本地持久化。
+
+### Phase 8 / C002 整理个人中心资料能力
+
+- 目标文件：`backend/src/main/java/com/cooperation/web/user/UserProfileController.java`、`frontend/src/pages/UserProfilePage.vue`、`frontend/src/services/userApi.ts`
+- 内容：对齐当前用户资料查询、资料更新和密码修改接口。
+- 验收：用户能查看资料、修改展示名称和邮箱、修改密码，缺少用户标识时有明确错误提示。
+
+### Phase 8 / C003 整理 SMTP 配置管理能力
+
+- 目标文件：`backend/src/main/java/com/cooperation/web/mail/SmtpConfigController.java`、`frontend/src/services/smtpConfigApi.ts`、`frontend/src/pages/UserProfilePage.vue`
+- 内容：对齐 SMTP/IMAP 配置的新增、修改、删除、测试发送和默认配置设置能力。
+- 验收：用户只能管理自己的配置；查询响应不返回明文密码；测试邮件必须由用户主动触发。
+
+### Phase 8 / C004 整理邮件草稿发送配置
+
+- 目标文件：`backend/src/main/java/com/cooperation/web/mail/MailDraftController.java`、`frontend/src/pages/MailDraftPage.vue`、`frontend/src/services/mailApi.ts`
+- 内容：发送邮件草稿时支持 `smtpConfigId`，为空时使用默认 SMTP 配置。
+- 验收：未确认发送不得调用发送端口；没有可用 SMTP 配置时提示先配置邮件设置。
+
+### Phase 8 / C005 整理邮件草稿总览
+
+- 目标文件：`frontend/src/pages/MailDraftPage.vue`、`frontend/src/services/mailApi.ts`
+- 内容：对齐用户维度草稿概览和项目维度草稿列表。
+- 验收：`/mail-drafts` 可查看当前用户参与项目的草稿概览，项目邮件页可查看当前项目草稿列表。
+
+### Phase 8 / C006 整理邀请加入页面
+
+- 目标文件：`backend/src/main/java/com/cooperation/web/member/MemberController.java`、`frontend/src/pages/JoinInvitationPage.vue`、`frontend/src/services/memberPermissionApi.ts`
+- 内容：对齐邀请详情、直接加入和等待审核两种加入结果。
+- 验收：加入成功跳转项目工作台；等待审核时展示明确状态。
+
+### Phase 8 / C007 整理文件评论能力
+
+- 目标文件：`backend/src/main/java/com/cooperation/web/file/FileCommentController.java`、`frontend/src/components/file/FileCommentDrawer.vue`、`frontend/src/services/fileApi.ts`
+- 内容：对齐评论列表、新增评论和删除评论接口。
+- 验收：评论与文件绑定，不参与打包、清理和邮件附件流程。
+
+### Phase 8 / C008 标记保留但入口未完整暴露的接口
+
+- 目标文件：`specs/spec.md`、`specs/plan.md`
+- 内容：明确文件移动、目录状态更新、加入申请审核、成员权限更新、项目结束/重开、压缩包历史列表和删除为保留能力。
+- 验收：后续接口清理不得仅因当前页面入口不完整而删除这些能力。
+
+最后生成时间：2026-06-01 21:56:56
 

@@ -3,6 +3,7 @@ package com.cooperation.web.member;
 import com.cooperation.application.member.CreateInvitationUseCase;
 import com.cooperation.application.member.JoinByInvitationUseCase;
 import com.cooperation.application.member.QueryInvitationUseCase;
+import com.cooperation.application.member.RemoveMemberUseCase;
 import com.cooperation.application.member.ReviewJoinRequestUseCase;
 import com.cooperation.web.common.ApiResponse;
 import com.cooperation.web.member.MemberDto.ApproveJoinRequest;
@@ -15,6 +16,7 @@ import com.cooperation.web.member.MemberDto.JoinInvitationResponse;
 import com.cooperation.web.member.MemberDto.RejectJoinRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +34,7 @@ public class MemberController {
     private final ObjectProvider<QueryInvitationUseCase> queryInvitationUseCase;
     private final ObjectProvider<JoinByInvitationUseCase> joinByInvitationUseCase;
     private final ObjectProvider<ReviewJoinRequestUseCase> reviewJoinRequestUseCase;
+    private final ObjectProvider<RemoveMemberUseCase> removeMemberUseCase;
 
     /**
      * 创建成员邀请控制器实例。
@@ -40,17 +43,20 @@ public class MemberController {
      * @param queryInvitationUseCase 查询邀请用例。
      * @param joinByInvitationUseCase 加入邀请用例。
      * @param reviewJoinRequestUseCase 审核加入申请用例。
+     * @param removeMemberUseCase 移除成员用例。
      */
     public MemberController(
             ObjectProvider<CreateInvitationUseCase> createInvitationUseCase,
             ObjectProvider<QueryInvitationUseCase> queryInvitationUseCase,
             ObjectProvider<JoinByInvitationUseCase> joinByInvitationUseCase,
-            ObjectProvider<ReviewJoinRequestUseCase> reviewJoinRequestUseCase
+            ObjectProvider<ReviewJoinRequestUseCase> reviewJoinRequestUseCase,
+            ObjectProvider<RemoveMemberUseCase> removeMemberUseCase
     ) {
         this.createInvitationUseCase = createInvitationUseCase;
         this.queryInvitationUseCase = queryInvitationUseCase;
         this.joinByInvitationUseCase = joinByInvitationUseCase;
         this.reviewJoinRequestUseCase = reviewJoinRequestUseCase;
+        this.removeMemberUseCase = removeMemberUseCase;
     }
 
     /**
@@ -148,6 +154,22 @@ public class MemberController {
                 new ReviewJoinRequestUseCase.RejectCommand(operatorId, requestId, request.reason())
         );
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 移除项目成员。
+     *
+     * @param membershipId 成员关系标识。
+     * @param currentUserId 当前用户标识。
+     * @return 操作结果。
+     */
+    @DeleteMapping("/memberships/{membershipId}")
+    public ApiResponse<Void> removeMember(
+            @PathVariable Long membershipId,
+            @RequestHeader("X-User-Id") Long currentUserId
+    ) {
+        removeMemberUseCase.getObject().remove(new RemoveMemberUseCase.Command(currentUserId, membershipId));
+        return ApiResponse.successWithoutData();
     }
 
     private JoinInvitationResponse toJoinInvitationResponse(JoinByInvitationUseCase.Result result) {

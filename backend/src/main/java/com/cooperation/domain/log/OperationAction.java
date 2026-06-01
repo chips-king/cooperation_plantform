@@ -17,6 +17,9 @@ public enum OperationAction {
     /** 成员加入申请被审核。 */
     MEMBER_REVIEWED,
 
+    /** 项目成员被移除。 */
+    MEMBER_REMOVED,
+
     /** 成员权限发生变更。 */
     PERMISSION_UPDATED,
 

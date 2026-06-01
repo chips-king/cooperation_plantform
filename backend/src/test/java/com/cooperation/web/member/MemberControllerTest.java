@@ -3,6 +3,7 @@ package com.cooperation.web.member;
 import com.cooperation.application.member.CreateInvitationUseCase;
 import com.cooperation.application.member.JoinByInvitationUseCase;
 import com.cooperation.application.member.QueryInvitationUseCase;
+import com.cooperation.application.member.RemoveMemberUseCase;
 import com.cooperation.application.member.ReviewJoinRequestUseCase;
 import com.cooperation.domain.permission.RoleTemplate;
 import com.cooperation.web.member.MemberDto.ApproveJoinRequestResponse;
@@ -18,7 +19,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -46,6 +49,9 @@ class MemberControllerTest {
     @MockBean
     private ReviewJoinRequestUseCase reviewJoinRequestUseCase;
 
+    @MockBean
+    private RemoveMemberUseCase removeMemberUseCase;
+
     /**
      * 创建直接加入邀请时，应返回统一成功结构和邀请链接信息。
      *
@@ -58,7 +64,7 @@ class MemberControllerTest {
                         71L,
                         21L,
                         501L,
-                        "direct_join",
+                        "direct",
                         "DIRECT-CODE",
                         "/invitations/DIRECT-CODE"
                 ));
@@ -68,7 +74,7 @@ class MemberControllerTest {
                         .content("""
                                 {
                                   "projectId": 501,
-                                  "mode": "direct_join",
+                                  "mode": "direct",
                                   "roleTemplate": "MEMBER"
                                 }
                                 """))
@@ -79,7 +85,7 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.data.invitationId").value(71))
                 .andExpect(jsonPath("$.data.groupId").value(21))
                 .andExpect(jsonPath("$.data.projectId").value(501))
-                .andExpect(jsonPath("$.data.mode").value("direct_join"))
+                .andExpect(jsonPath("$.data.mode").value("direct"))
                 .andExpect(jsonPath("$.data.code").value("DIRECT-CODE"))
                 .andExpect(jsonPath("$.data.invitationUrl").value("/invitations/DIRECT-CODE"));
     }
@@ -98,7 +104,7 @@ class MemberControllerTest {
                         "课程设计小组",
                         501L,
                         "期末资料整理",
-                        "review_required",
+                        "review",
                         "valid"
                 ));
 
@@ -110,7 +116,7 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.data.invitationId").value(72))
                 .andExpect(jsonPath("$.data.groupName").value("课程设计小组"))
                 .andExpect(jsonPath("$.data.projectName").value("期末资料整理"))
-                .andExpect(jsonPath("$.data.mode").value("review_required"))
+                .andExpect(jsonPath("$.data.mode").value("review"))
                 .andExpect(jsonPath("$.data.status").value("valid"));
     }
 
@@ -224,5 +230,21 @@ class MemberControllerTest {
                 .andExpect(jsonPath("$.message").value("操作成功"))
                 .andExpect(jsonPath("$.data.status").value("rejected"))
                 .andExpect(jsonPath("$.data.message").value("申请信息与项目不匹配"));
+    }
+
+    /**
+     * 移除成员时，应把当前用户和成员关系标识交给应用用例进行权限校验。
+     *
+     * @throws Exception MockMvc 调用失败时抛出异常。
+     */
+    @Test
+    void removeMemberDelegatesToUseCaseWithCurrentUser() throws Exception {
+        mockMvc.perform(delete("/memberships/{membershipId}", 201L)
+                        .header("X-User-Id", 1001L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("操作成功"));
+
+        verify(removeMemberUseCase).remove(new RemoveMemberUseCase.Command(1001L, 201L));
     }
 }

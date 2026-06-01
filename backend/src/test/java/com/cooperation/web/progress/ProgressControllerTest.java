@@ -59,9 +59,9 @@ class ProgressControllerTest {
                 3,
                 1,
                 List.of(
-                        new DirectoryProgressResponse("directory-prepare", "资料准备", "completed", "已完成", Instant.parse("2026-05-24T09:00:00Z")),
-                        new DirectoryProgressResponse(DIRECTORY_ID, "源代码", "in_progress", "进行中", Instant.parse("2026-05-24T10:00:00Z")),
-                        new DirectoryProgressResponse("directory-doc", "说明文档", "not_started", "未开始", Instant.parse("2026-05-24T11:00:00Z"))
+                        new DirectoryProgressResponse("directory-prepare", "资料准备", "completed", "已完成", Instant.parse("2026-05-24T09:00:00Z"), 2, false),
+                        new DirectoryProgressResponse(DIRECTORY_ID, "源代码", "in_progress", "进行中", Instant.parse("2026-05-24T10:00:00Z"), 5, false),
+                        new DirectoryProgressResponse("directory-doc", "说明文档", "not_started", "未开始", Instant.parse("2026-05-24T11:00:00Z"), 0, false)
                 )
         );
         given(listProjectProgressUseCase.getProgress(PROJECT_ID)).willReturn(response);

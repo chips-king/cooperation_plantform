@@ -101,6 +101,15 @@ class CreateGroupUseCaseTest {
         }
 
         @Override
+        public void deleteById(Long id) {
+        }
+
+        @Override
+        public List<Membership> findByProjectId(Long projectId) {
+            return List.of();
+        }
+
+        @Override
         public void deleteByGroupId(Long groupId) {
         }
 

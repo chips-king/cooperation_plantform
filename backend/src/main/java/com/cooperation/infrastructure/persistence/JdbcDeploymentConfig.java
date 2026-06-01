@@ -13,6 +13,7 @@ import com.cooperation.application.mail.CreateMailDraftUseCase;
 import com.cooperation.application.mail.DeleteMailDraftUseCase;
 import com.cooperation.application.mail.QueryMailDraftUseCase;
 import com.cooperation.application.mail.SendMailDraftUseCase;
+import com.cooperation.application.mail.SmtpConfigRepository;
 import com.cooperation.application.mail.UpdateMailDraftUseCase;
 import com.cooperation.application.member.Membership;
 import com.cooperation.application.member.MembershipRepository;
@@ -30,12 +31,14 @@ import com.cooperation.domain.check.CheckTarget;
 import com.cooperation.domain.log.OperationAction;
 import com.cooperation.domain.log.OperationAction;
 import com.cooperation.domain.mail.MailDraft;
+import com.cooperation.domain.mail.SmtpConfig;
 import com.cooperation.domain.notification.NotificationEventType;
 import com.cooperation.domain.packageartifact.PackageFormat;
 import com.cooperation.domain.permission.RoleTemplate;
 import com.cooperation.domain.permission.RoleTemplate;
 import com.cooperation.infrastructure.mail.MailSmtpProperties;
 import com.cooperation.infrastructure.mail.SmtpMailDraftSender;
+import com.cooperation.infrastructure.mail.SmtpPasswordEncryptor;
 import com.cooperation.infrastructure.storage.StorageProperties;
 import com.cooperation.web.file.FileDto;
 import com.cooperation.web.group.GroupDto.GroupResponse;
@@ -54,6 +57,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -257,12 +261,14 @@ public class JdbcDeploymentConfig {
             JdbcTemplate jdbcTemplate,
             MailSmtpProperties mailProperties,
             StorageProperties storageProperties,
+            SmtpConfigRepository smtpConfigRepository,
+            SmtpPasswordEncryptor passwordEncryptor,
             java.time.Clock clock
     ) {
         JdbcMailStore store = new JdbcMailStore(jdbcTemplate);
         return new SendMailDraftUseCase(
                 store,
-                new SmtpMailDraftSender(mailProperties, storageProperties, jdbcTemplate),
+                new SmtpMailDraftSender(mailProperties, storageProperties, jdbcTemplate, smtpConfigRepository, passwordEncryptor),
                 store,
                 store,
                 clock
@@ -295,6 +301,18 @@ public class JdbcDeploymentConfig {
 
     @Bean
     @ConditionalOnMissingBean
+    public SmtpPasswordEncryptor smtpPasswordEncryptor(@Value("${app.security.aes-key:}") String aesKey) {
+        return new SmtpPasswordEncryptor(aesKey);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public SmtpConfigRepository smtpConfigRepository(JdbcTemplate jdbcTemplate) {
+        return new JdbcSmtpConfigRepository(jdbcTemplate);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     @Primary
     public com.cooperation.application.directory.ListProjectProgressUseCase jdbcListProjectProgressUseCase(JdbcTemplate jdbcTemplate) {
         return projectId -> {
@@ -314,7 +332,7 @@ public class JdbcDeploymentConfig {
                            COUNT(f.id) AS file_count
                     FROM directories d
                     LEFT JOIN file_assets f ON f.directory_id = d.id AND f.status = 'active'
-                    WHERE d.project_id = ? AND d.name != 'root'
+                    WHERE d.project_id = ?
                     GROUP BY d.id, d.name, d.status, d.updated_at
                     ORDER BY d.id ASC
                     """, (rs, row) -> new com.cooperation.web.progress.ProgressDto.DirectoryProgressResponse(
@@ -667,6 +685,25 @@ public class JdbcDeploymentConfig {
         @Override
         public Optional<Membership> findByProjectIdAndUserId(Long projectId, Long userId) {
             return query("WHERE project_id = ? AND user_id = ? AND status = 'active'", projectId, userId);
+        }
+
+        @Override
+        public List<Membership> findByProjectId(Long projectId) {
+            return jdbcTemplate.query("""
+                    SELECT id, user_id, group_id, project_id, role_template FROM memberships
+                    WHERE project_id = ? AND status = 'active'
+                    """, (rs, row) -> {
+                Long pid = rs.getObject("project_id", Long.class);
+                Membership membership = pid == null
+                        ? Membership.groupLevel(rs.getLong("user_id"), rs.getLong("group_id"), RoleTemplate.valueOf(rs.getString("role_template")))
+                        : Membership.projectLevel(rs.getLong("user_id"), rs.getLong("group_id"), pid, RoleTemplate.valueOf(rs.getString("role_template")));
+                return membership.withId(rs.getLong("id"));
+            }, projectId);
+        }
+
+        @Override
+        public void deleteById(Long id) {
+            jdbcTemplate.update("DELETE FROM memberships WHERE id = ?", id);
         }
 
         @Override

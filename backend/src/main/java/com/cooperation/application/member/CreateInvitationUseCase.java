@@ -1,8 +1,11 @@
 package com.cooperation.application.member;
 
+import com.cooperation.application.invitation.Invitation;
+import com.cooperation.application.invitation.InvitationRepository;
 import com.cooperation.domain.permission.RoleTemplate;
 import com.cooperation.web.member.MemberDto.CreateInvitationResponse;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.stereotype.Service;
 
 /**
@@ -10,6 +13,14 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class CreateInvitationUseCase {
+
+    private final InvitationRepository invitationRepository;
+
+    private static final AtomicLong ID_GEN = new AtomicLong(1);
+
+    public CreateInvitationUseCase(InvitationRepository invitationRepository) {
+        this.invitationRepository = Objects.requireNonNull(invitationRepository, "邀请仓储不能为空");
+    }
 
     /**
      * 创建邀请。
@@ -20,11 +31,22 @@ public class CreateInvitationUseCase {
     public CreateInvitationResponse create(Command command) {
         Objects.requireNonNull(command, "创建邀请命令不能为空");
         String code = "INVITE-" + command.groupId() + "-" + command.projectId();
+        Long id = ID_GEN.getAndIncrement();
+
+        boolean requiresReview = "review".equals(command.mode()) || "review_required".equals(command.mode());
+        String responseMode = requiresReview ? "review" : "direct";
+
+        Invitation invitation = requiresReview
+                ? Invitation.reviewRequired(id, command.groupId(), command.projectId(), code, command.operatorId())
+                : Invitation.directJoin(id, command.groupId(), command.projectId(), code, command.operatorId());
+
+        invitationRepository.save(invitation);
+
         return new CreateInvitationResponse(
-                null,
+                id,
                 command.groupId(),
                 command.projectId(),
-                command.mode(),
+                responseMode,
                 code,
                 "/invitations/" + code
         );

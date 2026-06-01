@@ -665,6 +665,7 @@ GET    /projects/{projectId}
 PATCH  /projects/{projectId}
 POST   /projects/{projectId}/end
 POST   /projects/{projectId}/reopen
+DELETE /projects/{projectId}
 ```
 
 追踪：S3, S4, S16。
@@ -672,15 +673,12 @@ POST   /projects/{projectId}/reopen
 ### 8.2 成员与邀请
 
 ```text
-GET    /groups/{groupId}/members
-POST   /groups/{groupId}/members
-PATCH  /memberships/{membershipId}
-
 POST   /groups/{groupId}/invitations
 GET    /invitations/{code}
 POST   /invitations/{code}/join
 POST   /join-requests/{requestId}/approve
 POST   /join-requests/{requestId}/reject
+DELETE /memberships/{membershipId}
 ```
 
 追踪：S5, S6。
@@ -698,14 +696,11 @@ PATCH  /memberships/{membershipId}/permissions
 
 ```text
 GET    /projects/{projectId}/tree
-POST   /projects/{projectId}/directories
-PATCH  /directories/{directoryId}
-POST   /directories/{directoryId}/move
+POST   /directories
+DELETE /directories/{directoryId}
 
 POST   /directories/{directoryId}/files
-GET    /files/{fileId}
 GET    /files/{fileId}/download
-PATCH  /files/{fileId}
 POST   /files/{fileId}/move
 DELETE /files/{fileId}
 
@@ -736,7 +731,9 @@ POST   /projects/{projectId}/cleanup
 
 POST   /projects/{projectId}/packages
 GET    /projects/{projectId}/packages/latest
-GET    /packages/{packageId}/download
+GET    /projects/{projectId}/packages/latest/download
+GET    /projects/{projectId}/packages
+DELETE /projects/{projectId}/packages/{packageId}
 ```
 
 追踪：S11, S12, S13。
@@ -747,12 +744,35 @@ GET    /packages/{packageId}/download
 POST   /projects/{projectId}/mail-drafts
 GET    /mail-drafts/{draftId}
 PATCH  /mail-drafts/{draftId}
+DELETE /mail-drafts/{draftId}
 POST   /mail-drafts/{draftId}/send
+GET    /users/{userId}/mail-drafts
+GET    /projects/{projectId}/mail-drafts
 ```
 
 追踪：S14。
 
-### 8.8 操作记录与通知
+### 8.8 账号、个人中心与 SMTP 配置
+
+```text
+POST   /auth/login
+POST   /auth/register
+
+GET    /users/me
+PUT    /users/me
+PUT    /users/me/password
+
+GET    /smtp-configs
+POST   /smtp-configs
+PUT    /smtp-configs/{id}
+DELETE /smtp-configs/{id}
+POST   /smtp-configs/{id}/test
+PUT    /smtp-configs/{id}/default
+```
+
+追踪：S3, S14, S20。
+
+### 8.9 操作记录与通知
 
 ```text
 GET    /projects/{projectId}/operation-logs
@@ -762,7 +782,7 @@ POST   /notifications/{notificationId}/read
 
 追踪：S15, S17。
 
-### 8.9 搜索
+### 8.10 搜索
 
 ```text
 GET    /search/projects
@@ -772,7 +792,7 @@ GET    /search/members
 
 追踪：S4。
 
-### 8.10 应用层结果与命令契约补充
+### 8.11 应用层结果与命令契约补充
 
 以下契约用于指导 Controller DTO、前端 Service 和应用层测试对齐：
 
@@ -785,6 +805,7 @@ GET    /search/members
 | 生成压缩包 | snapshot_created_at | 文件树快照时间，压缩请求、结果和记录保持一致 | S13, S15 |
 | 创建邮件草稿 | attachment_filename | 草稿绑定压缩包的附件展示文件名 | S14 |
 | 发送邮件草稿 | confirmed | 用户是否完成发送确认；false 时不得调用邮箱发送端口 | S14 |
+| 发送邮件草稿 | smtp_config_id | 用户选择的 SMTP 配置标识；为空时使用默认配置 | S14, S20 |
 | 发送邮件草稿 | message | 发送结果提示语，用于前端反馈 | S14 |
 | 结束项目 | ProjectWriteLockPort.lockProjectWrites | 应用层写锁端口，项目结束后锁定写操作 | S16 |
 | 重新打开项目 | ProjectWriteLockPort.unlockProjectWrites | 应用层写锁端口，项目重新打开后恢复写操作 | S16 |
@@ -1358,18 +1379,16 @@ PROJECT_REOPENED
 13. 首页、搜索与筛选。
 14. 验收测试。
 
-最后生成时间：2026-05-26 15:03:52
+## 20. 小组删除实现说明
 
-## 19. 小组删除实现说明
-
-### 19.1 小组删除规则
+### 20.1 小组删除规则
 
 - 只有小组负责人可以删除小组。
 - 小组内存在项目时不允许删除。
 - 删除小组时级联删除该小组的成员关系。
 - 删除操作需要记录。
 
-### 19.2 相关接口
+### 20.2 相关接口
 
 ```text
 DELETE /groups/{groupId}
@@ -1384,7 +1403,7 @@ DELETE /groups/{groupId}
 }
 ```
 
-### 19.3 实现步骤
+### 20.3 实现步骤
 
 1. GroupRepository 新增 `deleteById` 方法。
 2. MembershipRepository 新增 `deleteByGroupId` 方法。
@@ -1397,3 +1416,77 @@ DELETE /groups/{groupId}
 4. GroupController 新增 `DELETE /groups/{groupId}`。
 5. 前端新增 `deleteGroup` API 和删除按钮。
 
+## 21. 当前能力现状对齐
+
+本节记录 2026-06-01 已澄清并进入主需求的能力，避免只存在于单项设计文档或代码改动中。
+
+### 21.1 账号与用户资料
+
+当前系统包含注册、登录、当前用户资料查询、资料更新和密码修改能力。前端登录后通过本地会话保存当前用户和权限摘要，HTTP 层统一补充 `Authorization` 与 `X-User-Id`。
+
+后续整理接口时，应保持登录注册入口独立于项目业务接口，不把用户资料接口混入小组或成员管理接口。
+
+### 21.2 SMTP 配置管理
+
+SMTP 配置作为邮件发送的正式配置来源。
+
+实体字段包括：
+
+- 配置名称。
+- SMTP 主机和端口。
+- 登录账号和加密后的密码。
+- 发件人地址。
+- IMAP 主机和端口。
+- SSL 与 STARTTLS 开关。
+- 默认配置标识。
+- 创建人。
+
+接口由 `SmtpConfigController` 提供，前端由 `smtpConfigApi.ts` 和个人中心邮件设置页调用。
+
+邮件发送流程：
+
+1. 邮件草稿页加载当前用户的 SMTP 配置列表。
+2. 用户发送草稿前选择发送邮箱。
+3. 前端提交 `smtpConfigId`。
+4. 后端优先使用指定配置，未指定时使用默认配置。
+5. 未找到可用配置时返回可理解错误。
+
+安全要求：
+
+- SMTP 密码传入后端后必须加密存储。
+- 查询配置时不得返回明文密码。
+- 发送测试邮件和正式发送都必须由用户主动触发。
+
+### 21.3 邮件草稿列表
+
+邮件草稿支持项目维度和用户维度查询。
+
+- 项目维度：用于项目邮件页展示该项目历史草稿。
+- 用户维度：用于邮件总览页展示当前用户参与项目的草稿概览。
+
+### 21.4 文件评论
+
+文件评论属于文件协作辅助能力，当前通过独立评论接口挂在文件资源下：
+
+```text
+GET    /files/{fileId}/comments
+POST   /files/{fileId}/comments
+DELETE /comments/{commentId}
+```
+
+评论不进入打包、清理和邮件附件流程。
+
+### 21.5 当前接口整理原则
+
+以下接口虽然当前页面入口不完整，但仍属于既有业务能力，不应直接删除：
+
+- 文件移动。
+- 目录状态更新。
+- 加入申请审核。
+- 成员权限更新。
+- 项目结束和重新打开。
+- 压缩包历史列表和删除。
+
+只有在需求明确取消时，才可以同步删除前端封装、后端接口、用例和测试。
+
+最后生成时间：2026-06-01 21:56:56

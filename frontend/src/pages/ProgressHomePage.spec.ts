@@ -11,6 +11,7 @@ import {
   listProjects,
 } from '@/services/groupProjectApi';
 import { getProjectProgress } from '@/services/fileApi';
+import type { ProjectProgress } from '@/types/project';
 
 vi.mock('@/services/groupProjectApi', () => ({
   createGroup: vi.fn(),
@@ -64,17 +65,23 @@ const projects = [
   },
 ];
 
-const progressDataMap: Record<string, { directories: Array<{ directoryId: string; name: string; fileCount: number; mailSent: boolean; updatedAt: string }> }> = {
+const progressDataMap: Record<string, ProjectProgress> = {
   '11': {
+    projectId: '11',
+    totalDirectoryCount: 3,
+    completedDirectoryCount: 1,
     directories: [
-      { directoryId: 'd1', name: '需求文档', fileCount: 5, mailSent: true, updatedAt: '2026-05-24T10:00:00' },
-      { directoryId: 'd2', name: '接口设计', fileCount: 3, mailSent: false, updatedAt: '2026-05-24T10:00:00' },
-      { directoryId: 'd3', name: '测试用例', fileCount: 0, mailSent: false, updatedAt: '2026-05-24T10:00:00' },
+      { directoryId: 'd1', name: '需求文档', status: 'completed', statusDisplayName: '已完成', fileCount: 5, mailSent: true, updatedAt: '2026-05-24T10:00:00' },
+      { directoryId: 'd2', name: '接口设计', status: 'in_progress', statusDisplayName: '进行中', fileCount: 3, mailSent: false, updatedAt: '2026-05-24T10:00:00' },
+      { directoryId: 'd3', name: '测试用例', status: 'not_started', statusDisplayName: '未开始', fileCount: 0, mailSent: false, updatedAt: '2026-05-24T10:00:00' },
     ],
   },
   '12': {
+    projectId: '12',
+    totalDirectoryCount: 1,
+    completedDirectoryCount: 1,
     directories: [
-      { directoryId: 'd4', name: '交付报告', fileCount: 2, mailSent: true, updatedAt: '2026-05-23T18:00:00' },
+      { directoryId: 'd4', name: '交付报告', status: 'completed', statusDisplayName: '已完成', fileCount: 2, mailSent: true, updatedAt: '2026-05-23T18:00:00' },
     ],
   },
 };
@@ -101,40 +108,44 @@ describe('ProgressHomePage', () => {
     mockedCreateGroup.mockResolvedValue({ groupId: 3 });
     mockedCreateProject.mockResolvedValue({ projectId: 13, status: 'active', updatedAt: '2026-05-25T10:00:00' });
     mockedGetProjectProgress.mockImplementation((projectId: string) => {
-      return Promise.resolve(progressDataMap[projectId] ?? { directories: [] });
+      return Promise.resolve(progressDataMap[projectId] ?? {
+        projectId,
+        totalDirectoryCount: 0,
+        completedDirectoryCount: 0,
+        directories: [],
+      });
     });
   });
 
-  it('加载数据并展示三列看板', async () => {
+  it('加载数据并展示项目总览', async () => {
     const wrapper = mountHomePage();
     await flushPromises();
 
     expect(mockedListGroups).toHaveBeenCalled();
     expect(mockedListProjects).toHaveBeenCalled();
-    expect(wrapper.text()).toContain('未开始');
-    expect(wrapper.text()).toContain('进行中');
-    expect(wrapper.text()).toContain('已完成');
-  });
-
-  it('目录卡片显示项目名称', async () => {
-    const wrapper = mountHomePage();
-    await flushPromises();
-
+    expect(wrapper.text()).toContain('项目总览');
     expect(wrapper.text()).toContain('组件测试建设');
     expect(wrapper.text()).toContain('交付归档项目');
   });
 
-  it('按状态正确分类目录', async () => {
+  it('项目卡片显示小组和项目状态', async () => {
     const wrapper = mountHomePage();
     await flushPromises();
 
-    // 未开始：fileCount=0 且 mailSent=false → 测试用例
-    expect(wrapper.text()).toContain('测试用例');
-    // 进行中：fileCount>0 且 mailSent=false → 接口设计
-    expect(wrapper.text()).toContain('接口设计');
-    // 已完成：mailSent=true → 需求文档、交付报告
-    expect(wrapper.text()).toContain('需求文档');
-    expect(wrapper.text()).toContain('交付报告');
+    expect(wrapper.text()).toContain('前端组');
+    expect(wrapper.text()).toContain('后端组');
+    expect(wrapper.text()).toContain('协作中');
+    expect(wrapper.text()).toContain('已结束');
+  });
+
+  it('根据项目进度展示项目统计', async () => {
+    const wrapper = mountHomePage();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('3 个目录');
+    expect(wrapper.text()).toContain('8 个文件');
+    expect(wrapper.text()).toContain('1 个目录');
+    expect(wrapper.text()).toContain('2 个文件');
   });
 
   it('通过首页动作创建小组和项目', async () => {
@@ -165,6 +176,6 @@ describe('ProgressHomePage', () => {
     const wrapper = mountHomePage();
     await flushPromises();
 
-    expect(wrapper.text()).toContain('暂无目录数据');
+    expect(wrapper.text()).toContain('暂无项目，请先创建小组和项目');
   });
 });

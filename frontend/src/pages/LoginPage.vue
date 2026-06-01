@@ -44,13 +44,17 @@
           登录
         </el-button>
       </el-form>
+
+      <p class="login-page__footer">
+        还没有账户？<router-link to="/register">立即注册</router-link>
+      </p>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 
 import { request } from '@/services/http';
@@ -69,6 +73,7 @@ interface LoginResponse {
 }
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 const loginFormRef = ref<FormInstance>();
 const submitting = ref(false);
@@ -128,7 +133,7 @@ async function submitLogin(): Promise<void> {
     authStore.setSession(response.user, response.token, response.permissions ?? []);
     loginForm.password = '';
     ElMessage.success('登录成功');
-    await router.push('/');
+    await router.push((route.query.redirect as string) || '/');
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '登录失败，请稍后重试';
   } finally {
@@ -201,5 +206,22 @@ async function submitLogin(): Promise<void> {
 .login-page__submit {
   width: 100%;
   margin-top: 8px;
+}
+
+.login-page__footer {
+  margin: 16px 0 0;
+  text-align: center;
+  color: #687386;
+  font-size: 14px;
+}
+
+.login-page__footer a {
+  color: #1d4f91;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.login-page__footer a:hover {
+  text-decoration: underline;
 }
 </style>

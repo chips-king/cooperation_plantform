@@ -1,27 +1,28 @@
 package com.cooperation.web.auth;
 
+import com.cooperation.domain.user.UserRepository;
+import com.cooperation.domain.user.UserRepository.UserProfile;
 import com.cooperation.web.common.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 登录 Web API 控制器，提供前端会话建立所需的最小账号密码登录接口。
+ * 登录 Web API 控制器，提供前端会话建立所需的账号密码登录接口。
  */
 @RestController
 public class AuthController {
 
-    private static final long DEFAULT_ADMIN_ID = 1L; // 默认管理员用户标识，用于真实用户认证接入前的开发登录。
-    private static final String DEFAULT_ADMIN_USERNAME = "admin"; // 默认管理员账号名。
-    private static final String DEFAULT_ADMIN_EMAIL = "admin@example.com"; // 默认管理员邮箱账号。
-    private static final String DEFAULT_ADMIN_PASSWORD = "123456"; // 默认管理员密码，仅用于本地开发验证。
-    private static final String DEFAULT_ADMIN_TOKEN = "dev-token-1"; // 默认管理员访问令牌，后续替换为真实令牌服务。
+    /** 开发阶段固定令牌前缀，后续替换为 JWT 签发服务。 */
+    private static final String DEV_TOKEN_PREFIX = "dev-token-";
 
-    private static final List<String> DEFAULT_ADMIN_PERMISSIONS = List.of(
+    private static final List<String> DEFAULT_PERMISSIONS = List.of(
             "project.view",
             "project.manage",
             "member.manage",
@@ -48,42 +49,111 @@ public class AuthController {
             "project.reopen"
     );
 
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    /**
+     * 创建登录控制器实例。
+     *
+     * @param userRepository 用户仓储，用于查询用户信息。
+     * @param passwordEncoder 密码编码器，用于验证密码。
+     */
+    public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
     /**
      * 使用账号密码登录系统。
      *
-     * @param request 登录请求。
+     * @param request 登录请求，包含账号和密码。
      * @return 登录成功时返回会话信息，失败时返回未授权错误。
      */
     @PostMapping("/auth/login")
-    public ResponseEntity<ApiResponse<AuthDto.LoginResponse>> login(@Valid @RequestBody AuthDto.LoginRequest request) {
-        if (!isDefaultAdminCredential(request)) {
+    public ResponseEntity<ApiResponse<AuthDto.LoginResponse>> login(
+            @Valid @RequestBody AuthDto.LoginRequest request) {
+
+        // 1. 按账号（展示名称或邮箱）查找用户
+        Optional<UserProfile> userOpt = userRepository.findByLoginAccount(request.account());
+        if (userOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.failure("AUTH_FAILED", "账号或密码错误", null));
         }
 
-        AuthDto.CurrentUserResponse user = new AuthDto.CurrentUserResponse(
-                DEFAULT_ADMIN_ID,
-                "管理员",
-                DEFAULT_ADMIN_EMAIL,
-                "active"
+        UserProfile user = userOpt.get();
+
+        // 2. 查询该用户的密码哈希并验证
+        Optional<String> passwordHashOpt = userRepository.findPasswordHashById(user.id());
+        if (passwordHashOpt.isEmpty() || passwordHashOpt.get() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.failure("AUTH_FAILED", "该账户尚未设置密码", null));
+        }
+
+        if (!passwordEncoder.matches(request.password(), passwordHashOpt.get())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.failure("AUTH_FAILED", "账号或密码错误", null));
+        }
+
+        // 3. 签发开发令牌并返回用户信息
+        String token = DEV_TOKEN_PREFIX + user.id();
+        AuthDto.CurrentUserResponse userResponse = new AuthDto.CurrentUserResponse(
+                user.id(),
+                user.displayName(),
+                user.email(),
+                user.status()
         );
         AuthDto.LoginResponse response = new AuthDto.LoginResponse(
-                user,
-                DEFAULT_ADMIN_TOKEN,
-                DEFAULT_ADMIN_PERMISSIONS
-        );
+                userResponse, token, DEFAULT_PERMISSIONS);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
-     * 判断请求是否匹配默认管理员凭据。
+     * 注册新用户。
      *
-     * @param request 登录请求。
-     * @return 凭据正确时返回 true。
+     * @param request 注册请求，包含用户名、密码、展示名称和邮箱。
+     * @return 注册成功时返回登录响应，失败时返回冲突错误。
      */
-    private boolean isDefaultAdminCredential(AuthDto.LoginRequest request) {
-        boolean accountMatched = DEFAULT_ADMIN_USERNAME.equals(request.account())
-                || DEFAULT_ADMIN_EMAIL.equalsIgnoreCase(request.account());
-        return accountMatched && DEFAULT_ADMIN_PASSWORD.equals(request.password());
+    @PostMapping("/auth/register")
+    public ResponseEntity<ApiResponse<AuthDto.LoginResponse>> register(
+            @Valid @RequestBody AuthDto.RegisterRequest request) {
+
+        // 1. 检查用户名是否已被占用
+        if (userRepository.findByUsername(request.username()).isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiResponse.failure("USERNAME_EXISTS", "该用户名已被注册", null));
+        }
+
+        // 2. 检查邮箱是否已被占用
+        if (userRepository.findByEmail(request.email()).isPresent()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiResponse.failure("EMAIL_EXISTS", "该邮箱已被注册", null));
+        }
+
+        // 3. 加密密码并创建用户
+        String passwordHash = passwordEncoder.encode(request.password());
+        Optional<UserProfile> newUserOpt = userRepository.createUser(
+                request.username(),
+                request.displayName(),
+                request.email(),
+                passwordHash
+        );
+
+        if (newUserOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.failure("REGISTER_FAILED", "注册失败，请稍后重试", null));
+        }
+
+        // 4. 注册成功后自动签发令牌，方便前端直接跳转
+        UserProfile newUser = newUserOpt.get();
+        String token = DEV_TOKEN_PREFIX + newUser.id();
+        AuthDto.CurrentUserResponse userResponse = new AuthDto.CurrentUserResponse(
+                newUser.id(),
+                newUser.displayName(),
+                newUser.email(),
+                newUser.status()
+        );
+        AuthDto.LoginResponse response = new AuthDto.LoginResponse(
+                userResponse, token, DEFAULT_PERMISSIONS);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 }

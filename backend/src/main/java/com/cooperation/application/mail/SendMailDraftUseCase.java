@@ -58,7 +58,7 @@ public class SendMailDraftUseCase {
         }
 
         try {
-            mailProviderPort.sendDraft(command.draftId(), draft);
+            mailProviderPort.sendDraft(command.draftId(), draft, command.actorId(), command.smtpConfigId());
         } catch (RuntimeException ex) {
             String failureReason = resolveFailureReason(ex);
             draft.markSendFailed(failureReason);
@@ -92,7 +92,7 @@ public class SendMailDraftUseCase {
      * @param actorId 操作人标识
      * @param confirmed 是否已由负责人确认发送
      */
-    public record Command(String draftId, String actorId, boolean confirmed) implements ApplicationCommand {
+    public record Command(String draftId, String actorId, boolean confirmed, Long smtpConfigId) implements ApplicationCommand {
     }
 
     /**
@@ -136,8 +136,10 @@ public class SendMailDraftUseCase {
          *
          * @param draftId 草稿标识
          * @param draft 草稿实体
+         * @param actorId 操作人标识
+         * @param smtpConfigId SMTP 配置标识，为空时使用默认配置
          */
-        void sendDraft(String draftId, MailDraft draft);
+        void sendDraft(String draftId, MailDraft draft, String actorId, Long smtpConfigId);
     }
 
     /**
