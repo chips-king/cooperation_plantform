@@ -11,6 +11,7 @@
 不用再手动收集每个人的文件、来回传压缩包了。
 
 > 本项目采用 **SDD（Specification-Driven Development，规格驱动开发）** 方法论，所有功能先写需求规格说明（见 `specs/spec.md`），再按任务计划（见 `specs/tasks.md`）逐步实现。开发流程遵循 [AGENTS.md](./AGENTS.md) 中的约定。
+> SMTP 邮件配置等专项设计已整合进主需求规格 `specs/spec.md`，不再维护单独的 `docs/specs` 子文档。
 
 ---
 
