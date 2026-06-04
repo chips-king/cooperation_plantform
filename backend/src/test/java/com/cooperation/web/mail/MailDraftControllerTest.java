@@ -1,6 +1,7 @@
 package com.cooperation.web.mail;
 
 import com.cooperation.application.mail.CreateMailDraftUseCase;
+import com.cooperation.application.mail.DeleteMailDraftUseCase;
 import com.cooperation.application.mail.QueryMailDraftUseCase;
 import com.cooperation.application.mail.SendMailDraftUseCase;
 import com.cooperation.application.mail.UpdateMailDraftUseCase;
@@ -58,6 +59,12 @@ class MailDraftControllerTest {
 
     @MockBean
     private SendMailDraftUseCase sendMailDraftUseCase;
+
+    @MockBean
+    private DeleteMailDraftUseCase deleteMailDraftUseCase;
+
+    @MockBean
+    private MailDraftListPort mailDraftListPort;
 
     /**
      * 创建草稿应返回附件展示名 attachmentFilename，便于前端核对最近压缩包。

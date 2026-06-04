@@ -26,11 +26,17 @@ app:
   security:
     # aes-key 用于 SMTP 密码加密的 AES-256 密钥（十六进制编码，64 字符），生产环境必须通过环境变量注入。
     aes-key: ${APP_AES_KEY:}
+    # token-secret 用于登录 Bearer 令牌签名；生产环境必须通过环境变量注入随机长字符串。
+    token-secret: ${APP_TOKEN_SECRET:}
 
   # file-storage 保存文件存储相关配置。
   file-storage:
     # root 指定上传文件、回收站文件和最终压缩包的根目录，不允许为空。
     root: ${APP_FILE_STORAGE_ROOT:./data/storage}
+    # max-upload-bytes 指定单个上传文件大小上限，默认 100MiB，超过后在读取内容前拒绝。
+    max-upload-bytes: ${APP_MAX_UPLOAD_BYTES:104857600}
+    # max-package-download-bytes 指定压缩包下载大小上限，默认 200MiB，超过后拒绝一次性读入内存。
+    max-package-download-bytes: ${APP_MAX_PACKAGE_DOWNLOAD_BYTES:209715200}
 
   # mail 保存部署态邮件发送配置；未启用时发送接口会明确失败。
   mail:

@@ -17,6 +17,7 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+import com.cooperation.infrastructure.security.AuthTokenService;
 
 /**
  * 后端应用部署态上下文加载测试，使用真实 MySQL 容器验证迁移和接口启动链路。
@@ -47,6 +48,9 @@ class CooperationApplicationTests {
     @Autowired
     private TestRestTemplate restTemplate;
 
+    @Autowired
+    private AuthTokenService authTokenService;
+
     /**
      * 注册测试容器连接信息，覆盖本机环境中的数据库账号。
      *
@@ -74,7 +78,7 @@ class CooperationApplicationTests {
     @Test
     void projectsEndpointReturnsSuccessWithEmptyDatabase() {
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth("dev-token-1");
+        headers.setBearerAuth(authTokenService.issue(1L));
         headers.set("X-User-Id", "1");
 
         ResponseEntity<String> response = restTemplate.exchange(

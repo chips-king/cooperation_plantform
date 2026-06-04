@@ -28,6 +28,7 @@ import com.cooperation.web.file.FileDto.MoveFileRequest;
 import com.cooperation.web.file.FileDto.RestoreFileRequest;
 import com.cooperation.web.file.FileDto.TrashFileResponse;
 import com.cooperation.web.file.FileDto.UploadFileResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -61,6 +62,7 @@ public class FileController {
     private final EmptyTrashUseCase emptyTrashUseCase;
     private final UploadDirectoryResolver uploadDirectoryResolver;
     private final DirectoryManagementUseCase directoryManagementUseCase;
+    private final long maxUploadBytes;
 
     /**
      * 创建文件控制器。
@@ -75,6 +77,7 @@ public class FileController {
      * @param emptyTrashUseCase 清空回收站用例。
      * @param uploadDirectoryResolver 上传目录解析端口。
      * @param directoryManagementUseCase 目录管理用例。
+     * @param maxUploadBytes 单个上传文件允许的最大字节数。
      */
     public FileController(
             ListDirectoryTreeUseCase listDirectoryTreeUseCase,
@@ -86,7 +89,8 @@ public class FileController {
             RestoreFileUseCase restoreFileUseCase,
             EmptyTrashUseCase emptyTrashUseCase,
             UploadDirectoryResolver uploadDirectoryResolver,
-            DirectoryManagementUseCase directoryManagementUseCase
+            DirectoryManagementUseCase directoryManagementUseCase,
+            @Value("${app.file-storage.max-upload-bytes:104857600}") long maxUploadBytes
     ) {
         this.listDirectoryTreeUseCase = listDirectoryTreeUseCase;
         this.uploadFileUseCase = uploadFileUseCase;
@@ -98,6 +102,7 @@ public class FileController {
         this.emptyTrashUseCase = emptyTrashUseCase;
         this.uploadDirectoryResolver = uploadDirectoryResolver;
         this.directoryManagementUseCase = directoryManagementUseCase;
+        this.maxUploadBytes = maxUploadBytes;
     }
 
     /**
@@ -173,6 +178,9 @@ public class FileController {
             @RequestParam(required = false) String relativePath,
             @RequestParam("file") MultipartFile file
     ) throws IOException {
+        if (file.getSize() > maxUploadBytes) {
+            throw new IllegalArgumentException("上传文件不能超过 " + maxUploadBytes + " 字节");
+        }
         String targetDirectoryId = uploadDirectoryResolver.resolveTargetDirectory(projectId, directoryId, relativePath, actorId);
         String filename = relativePath == null || relativePath.isBlank() ? file.getOriginalFilename() : relativePath;
         UploadFileResult result = uploadFileUseCase.upload(new UploadFileCommand(

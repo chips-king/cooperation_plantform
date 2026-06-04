@@ -2,6 +2,7 @@ package com.cooperation.web.auth;
 
 import com.cooperation.domain.user.UserRepository;
 import com.cooperation.domain.user.UserRepository.UserProfile;
+import com.cooperation.infrastructure.security.AuthTokenService;
 import com.cooperation.web.common.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -18,9 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 public class AuthController {
-
-    /** 开发阶段固定令牌前缀，后续替换为 JWT 签发服务。 */
-    private static final String DEV_TOKEN_PREFIX = "dev-token-";
 
     private static final List<String> DEFAULT_PERMISSIONS = List.of(
             "project.view",
@@ -51,16 +49,23 @@ public class AuthController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthTokenService authTokenService;
 
     /**
      * 创建登录控制器实例。
      *
      * @param userRepository 用户仓储，用于查询用户信息。
      * @param passwordEncoder 密码编码器，用于验证密码。
+     * @param authTokenService 登录令牌服务，用于签发带签名的 Bearer 令牌。
      */
-    public AuthController(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthController(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            AuthTokenService authTokenService
+    ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.authTokenService = authTokenService;
     }
 
     /**
@@ -94,8 +99,8 @@ public class AuthController {
                     .body(ApiResponse.failure("AUTH_FAILED", "账号或密码错误", null));
         }
 
-        // 3. 签发开发令牌并返回用户信息
-        String token = DEV_TOKEN_PREFIX + user.id();
+        // 3. 签发带签名的登录令牌并返回用户信息。
+        String token = authTokenService.issue(user.id());
         AuthDto.CurrentUserResponse userResponse = new AuthDto.CurrentUserResponse(
                 user.id(),
                 user.displayName(),
@@ -143,9 +148,9 @@ public class AuthController {
                     .body(ApiResponse.failure("REGISTER_FAILED", "注册失败，请稍后重试", null));
         }
 
-        // 4. 注册成功后自动签发令牌，方便前端直接跳转
+        // 4. 注册成功后自动签发带签名令牌，方便前端直接跳转。
         UserProfile newUser = newUserOpt.get();
-        String token = DEV_TOKEN_PREFIX + newUser.id();
+        String token = authTokenService.issue(newUser.id());
         AuthDto.CurrentUserResponse userResponse = new AuthDto.CurrentUserResponse(
                 newUser.id(),
                 newUser.displayName(),

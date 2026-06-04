@@ -9,6 +9,7 @@ import { getProject } from '@/services/groupProjectApi';
 import { listOperationLogs } from '@/services/activityApi';
 import { getLatestPackage } from '@/services/packageApi';
 import { createDirectory, getDirectoryTree, uploadFile } from '@/services/fileApi';
+import { getProjectPermissions } from '@/services/memberPermissionApi';
 
 const routerPush = vi.fn();
 
@@ -26,6 +27,11 @@ vi.mock('@/services/groupProjectApi', () => ({ getProject: vi.fn() }));
 vi.mock('@/services/activityApi', () => ({ listOperationLogs: vi.fn() }));
 vi.mock('@/services/packageApi', () => ({ getLatestPackage: vi.fn() }));
 vi.mock('@/services/fileApi', () => ({ createDirectory: vi.fn(), getDirectoryTree: vi.fn(), uploadFile: vi.fn() }));
+vi.mock('@/services/memberPermissionApi', () => ({
+  createInvitation: vi.fn(),
+  getProjectPermissions: vi.fn(),
+  removeMember: vi.fn(),
+}));
 
 const mockedRequest = vi.mocked(request);
 const mockedGetProject = vi.mocked(getProject);
@@ -34,6 +40,7 @@ const mockedGetLatestPackage = vi.mocked(getLatestPackage);
 const mockedUploadFile = vi.mocked(uploadFile);
 const mockedCreateDirectory = vi.mocked(createDirectory);
 const mockedGetDirectoryTree = vi.mocked(getDirectoryTree);
+const mockedGetProjectPermissions = vi.mocked(getProjectPermissions);
 
 function mountProjectWorkspacePage() {
   return mount(ProjectWorkspacePage, {
@@ -69,6 +76,7 @@ describe('ProjectWorkspacePage', () => {
     });
     mockedListOperationLogs.mockResolvedValue({ logs: [] });
     mockedGetLatestPackage.mockRejectedValue(new Error('没有压缩包'));
+    mockedGetProjectPermissions.mockResolvedValue({ projectId: 1, members: [] });
     // 项目无目录时，目录树返回空列表（不再自动创建默认分工目录）
     mockedGetDirectoryTree.mockResolvedValue({
       projectId: '1',

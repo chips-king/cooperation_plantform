@@ -149,6 +149,8 @@
               <el-form-item label="收件人" prop="recipientsText">
                 <el-input
                   v-model="form.recipientsText"
+                  type="textarea"
+                  :rows="3"
                   placeholder="多个收件人可用逗号或换行分隔"
                 />
               </el-form-item>
@@ -165,6 +167,7 @@
                 <div v-if="latestPackage" class="package-info">
                   <el-tag type="success">{{ latestPackage.filename }}</el-tag>
                   <span class="package-hint">（已自动绑定最新压缩包）</span>
+                  <span v-if="latestPackage.format === 'zip'" class="package-hint">推荐使用 .zip 作为邮件附件格式</span>
                 </div>
                 <el-tag v-else type="warning">请先生成最终压缩包</el-tag>
               </el-form-item>
@@ -182,7 +185,7 @@
 
               <el-form-item>
                 <el-button :icon="DocumentAdd" :loading="saving" type="primary" @click="handleSaveDraft">
-                  暂时保存
+                  {{ draft ? '保存修改' : '生成草稿' }}
                 </el-button>
                 <el-button :disabled="!draft || draft.status === 'sent'" :loading="sending" type="danger" @click="handleSendDraft">
                   确认发送
@@ -392,27 +395,14 @@ async function loadDraftDetail(draftId: string): Promise<void> {
  */
 async function loadLatestPackage(): Promise<void> {
   if (!projectId.value) {
-    console.log('loadLatestPackage: 没有 projectId');
     return;
   }
 
   loadingLatest.value = true;
-  console.log('loadLatestPackage: 开始加载, projectId =', projectId.value);
 
   try {
     latestPackage.value = await getLatestPackage(projectId.value, { userId: authStore.currentUser?.id });
-    console.log('✅ 当前项目最新压缩包:', latestPackage.value);
-    console.log('   - packageId:', latestPackage.value?.packageId);
-    console.log('   - filename:', latestPackage.value?.filename);
-    console.log('   - format:', latestPackage.value?.format);
-    
-    // 检查是否是默认假数据
-    if (latestPackage.value?.packageId === 'package-demo') {
-      console.warn('⚠️ 注意：这是默认的假数据包，不是真实打包的文件！');
-      console.warn('   请确认您是否真的在项目工作台完成了打包操作');
-    }
   } catch (error) {
-    console.error('❌ 加载最新压缩包失败:', error);
     latestPackage.value = null;
   } finally {
     loadingLatest.value = false;

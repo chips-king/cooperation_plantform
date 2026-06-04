@@ -164,6 +164,9 @@ cooperation-frontend | VITE v5.x.x  ready in 350 ms
 
 ```
 cooperation/
+├── delivery/                       交付索引（集中说明 SDD 文档、测试和验收报告位置）
+│   ├── README.md                   交付材料索引
+│   └── unit-tests.md               单元测试与集成测试清单
 ├── backend/                       后端（Spring Boot）
 │   ├── src/main/java/              Java 源码
 │   │   └── com/cooperation/
@@ -172,7 +175,7 @@ cooperation/
 │   │       ├── infrastructure/     基础设施层（数据库、外部服务）
 │   │       └── web/                Web 层（控制器、请求/响应模型）
 │   ├── src/main/resources/         配置文件
-│   ├── src/test/                   后端测试
+│   ├── src/test/                   后端测试（JUnit 5、Testcontainers）
 │   ├── Dockerfile                  后端 Docker 镜像
 │   └── pom.xml                     Maven 依赖管理
 ├── frontend/                       前端（Vue 3）
@@ -183,14 +186,16 @@ cooperation/
 │   │   ├── services/               API 请求封装
 │   │   ├── router/                 路由配置
 │   │   ├── types/                  TypeScript 类型定义
-│   │   └── layouts/                布局组件
+│   │   ├── layouts/                布局组件
+│   │   └── **/*.spec.ts            前端单元测试（Vitest）
 │   ├── index.html                  入口 HTML
 │   ├── Dockerfile                  前端 Docker 镜像
 │   └── package.json                npm 依赖管理
 ├── specs/                          SDD 需求文档和任务计划
 │   ├── spec.md                     需求规格说明
-│   ├── tasks.md                    开发任务清单
 │   ├── plan.md                     实施计划
+│   ├── tasks.md                    开发任务清单
+│   ├── test-report.md              项目验收测试报告
 │   └── agent-dispatch-plan.md      Agent 调度计划
 ├── data/                           运行时数据（已 git 忽略）
 ├── docker-compose.yml              一键部署编排文件
@@ -209,10 +214,10 @@ cooperation/
 
 ```bash
 docker run -d --name mysql-dev \
-  -e MYSQL_ROOT_PASSWORD=root123 \
+  -e MYSQL_ROOT_PASSWORD=change_root_me \
   -e MYSQL_DATABASE=cooperation \
   -e MYSQL_USER=cooperation_user \
-  -e MYSQL_PASSWORD=dev123 \
+  -e MYSQL_PASSWORD=change_me \
   -p 3306:3306 \
   mysql:8.4
 ```
@@ -339,4 +344,4 @@ npm config set registry https://registry.npmmirror.com
 
 ---
 
-最后更新时间：2026-06-01 21:56:56
+最后更新时间：2026-06-04 09:15:00

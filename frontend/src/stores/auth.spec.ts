@@ -17,11 +17,11 @@ describe('auth store', () => {
 
     store.setSession(
       { id: 1, displayName: '管理员', email: 'admin@example.com' },
-      'dev-token-1',
+      'signed-test-token',
       ['project.view'],
     );
 
-    expect(window.localStorage.getItem('access_token')).toBe('dev-token-1');
+    expect(window.localStorage.getItem('access_token')).toBe('signed-test-token');
     expect(window.localStorage.getItem('current_user')).toContain('admin@example.com');
     expect(window.localStorage.getItem('permissions')).toContain('project.view');
   });

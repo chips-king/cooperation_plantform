@@ -1,25 +1,30 @@
 package com.cooperation.infrastructure.security;
 
+import com.cooperation.domain.user.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
@@ -32,9 +37,19 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Configuration
 public class SecurityConfig {
 
-    private static final String DEFAULT_USERNAME = "admin"; // 临时内存账号用户名，用于真实用户表接入前的最小认证。
-    private static final String DEFAULT_PASSWORD = "123456"; // 临时内存账号密码，仅用于当前阶段本地安全链路验证。
-    private static final String DEFAULT_ROLE = "ADMIN"; // 临时内存账号角色，后续接入权限模型后替换为真实角色来源。
+    private final AuthTokenService authTokenService;
+    private final UserRepository userRepository;
+
+    /**
+     * 创建安全配置。
+     *
+     * @param authTokenService 登录令牌服务，用于校验 Bearer 令牌签名。
+     * @param userRepositoryProvider 用户仓储提供器，用于生产环境校验令牌用户仍然有效。
+     */
+    public SecurityConfig(AuthTokenService authTokenService, ObjectProvider<UserRepository> userRepositoryProvider) {
+        this.authTokenService = authTokenService;
+        this.userRepository = userRepositoryProvider.getIfAvailable();
+    }
 
     /**
      * 创建全局安全过滤链，统一接入认证入口并保护业务接口。
@@ -65,10 +80,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/invitations/*").permitAll()
                         .anyRequest().authenticated()
                 )
-                // 识别开发期登录接口返回的 Bearer 令牌，让前端登录后可直接访问受保护 API。
-                .addFilterBefore(new DevBearerTokenFilter(), UsernamePasswordAuthenticationFilter.class)
-                // 使用 HTTP Basic 建立最小账号密码登录链路，后续可替换为真实用户表或表单登录。
-                .httpBasic(Customizer.withDefaults())
+                // 识别登录接口签发的签名 Bearer 令牌，让前端登录后访问受保护 API。
+                .addFilterBefore(new SignedBearerTokenFilter(authTokenService, userRepository), UsernamePasswordAuthenticationFilter.class)
+                // 关闭 HTTP Basic，避免默认内存账号或生成密码成为额外登录入口。
+                .httpBasic(AbstractHttpConfigurer::disable)
                 // 未登录访问受保护接口时统一返回 401，避免默认登录页重定向干扰 API 调用方。
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
@@ -76,30 +91,32 @@ public class SecurityConfig {
     }
 
     /**
-     * 创建测试期内存用户服务，作为完整用户表接入前的最小认证来源。
+     * 注册空用户详情服务，阻止 Spring Boot 生成默认密码；系统登录统一走用户表和签名令牌。
      *
-     * @param passwordEncoder 密码编码器
-     * @return 内存用户详情服务
+     * @return 不包含任何默认账号的用户详情服务。
      */
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        UserDetails defaultUser = User.withUsername(DEFAULT_USERNAME)
-                .password(passwordEncoder.encode(DEFAULT_PASSWORD))
-                .roles(DEFAULT_ROLE)
-                .build();
-        return new InMemoryUserDetailsManager(defaultUser);
+    public UserDetailsService userDetailsService() {
+        return new InMemoryUserDetailsManager();
     }
 
     /**
-     * 开发期 Bearer 令牌过滤器，将 dev-token-用户标识 转换为认证上下文。
+     * 签名 Bearer 令牌过滤器，将合法 token 转换为认证上下文。
      */
-    private static final class DevBearerTokenFilter extends OncePerRequestFilter {
+    private static final class SignedBearerTokenFilter extends OncePerRequestFilter {
 
         private static final String BEARER_PREFIX = "Bearer "; // HTTP Authorization 头中 Bearer 令牌的标准前缀。
-        private static final String DEV_TOKEN_PREFIX = "dev-token-"; // 本地开发登录令牌前缀，后续替换为真实 JWT 校验。
+        private static final String USER_ID_HEADER = "X-User-Id"; // 兼容旧版 Controller 的用户标识请求头。
+        private final AuthTokenService authTokenService;
+        private final UserRepository userRepository;
+
+        private SignedBearerTokenFilter(AuthTokenService authTokenService, UserRepository userRepository) {
+            this.authTokenService = authTokenService;
+            this.userRepository = userRepository;
+        }
 
         /**
-         * 解析请求中的开发期 Bearer 令牌并写入 Spring Security 上下文。
+         * 解析请求中的签名 Bearer 令牌并写入 Spring Security 上下文。
          *
          * @param request 当前 HTTP 请求。
          * @param response 当前 HTTP 响应。
@@ -115,21 +132,99 @@ public class SecurityConfig {
         ) throws ServletException, IOException {
             String authorization = request.getHeader("Authorization");
 
-            // 只处理本地开发登录接口签发的令牌，其他认证方式继续交给后续过滤器。
+            // 只处理登录接口签发的有效令牌，非法令牌保持匿名并交给认证入口返回 401。
             if (authorization != null && authorization.startsWith(BEARER_PREFIX)) {
                 String token = authorization.substring(BEARER_PREFIX.length());
-                if (token.startsWith(DEV_TOKEN_PREFIX)) {
-                    String userId = token.substring(DEV_TOKEN_PREFIX.length());
+                authTokenService.authenticate(token).ifPresent(userId -> {
+                    if (!isActiveUser(userId)) {
+                        return;
+                    }
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            userId,
+                            String.valueOf(userId),
                             token,
                             List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
                     );
                     SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+                });
             }
 
-            filterChain.doFilter(request, response);
+            String authenticatedUserId = currentAuthenticatedUserId();
+            if (authenticatedUserId == null) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String headerUserId = request.getHeader(USER_ID_HEADER);
+            if (headerUserId != null && !headerUserId.equals(authenticatedUserId)) {
+                response.sendError(HttpStatus.FORBIDDEN.value(), "X-User-Id 与认证用户不一致");
+                return;
+            }
+
+            filterChain.doFilter(new AuthenticatedUserHeaderRequest(request, authenticatedUserId), response);
+        }
+
+        private String currentAuthenticatedUserId() {
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated() || authentication.getName() == null) {
+                return null;
+            }
+            return authentication.getName();
+        }
+
+        private boolean isActiveUser(Long userId) {
+            if (userRepository == null) {
+                return true;
+            }
+            return userRepository.findById(userId)
+                    .map(user -> "active".equalsIgnoreCase(user.status()))
+                    .orElse(false);
+        }
+    }
+
+    /**
+     * 为旧版依赖 X-User-Id 的 Controller 补充认证用户请求头，避免继续信任客户端传值。
+     */
+    private static final class AuthenticatedUserHeaderRequest extends HttpServletRequestWrapper {
+
+        private static final String USER_ID_HEADER = "X-User-Id"; // 兼容旧版 Controller 的用户标识请求头。
+        private final String userId;
+
+        private AuthenticatedUserHeaderRequest(HttpServletRequest request, String userId) {
+            super(request);
+            this.userId = userId;
+        }
+
+        @Override
+        public String getHeader(String name) {
+            if (isUserIdHeader(name)) {
+                return userId;
+            }
+            return super.getHeader(name);
+        }
+
+        @Override
+        public Enumeration<String> getHeaders(String name) {
+            if (isUserIdHeader(name)) {
+                return Collections.enumeration(List.of(userId));
+            }
+            return super.getHeaders(name);
+        }
+
+        @Override
+        public Enumeration<String> getHeaderNames() {
+            LinkedHashSet<String> headerNames = new LinkedHashSet<>();
+            Enumeration<String> originalHeaderNames = super.getHeaderNames();
+            while (originalHeaderNames.hasMoreElements()) {
+                headerNames.add(originalHeaderNames.nextElement());
+            }
+            if (headerNames.stream().noneMatch(this::isUserIdHeader)) {
+                headerNames.add(USER_ID_HEADER);
+            }
+            return Collections.enumeration(new ArrayList<>(headerNames));
+        }
+
+        private boolean isUserIdHeader(String name) {
+            return USER_ID_HEADER.toLowerCase(Locale.ROOT).equals(name == null ? "" : name.toLowerCase(Locale.ROOT));
         }
     }
 }

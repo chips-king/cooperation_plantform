@@ -537,7 +537,7 @@
 ### Phase 3 / A009 [P] 编写打包检查用例测试
 
 - 标记：[P]
-- 目标文件：`backend/src/test/java/com/cooperation/application/check/RunPackageCheckUseCaseTest.java`
+- 目标文件：`backend/src/test/java/com/cooperation/application/packageartifact/RunPackageCheckUseCaseTest.java`
 - 依赖：D026, D027
 - 内容：测试生成风险列表和清理建议，检查结果不阻止打包。
 - 验收：压缩包只提示风险，不进入清理建议。
@@ -545,7 +545,7 @@
 ### Phase 3 / A010 [P] 编写应用清理建议用例测试
 
 - 标记：[P]
-- 目标文件：`backend/src/test/java/com/cooperation/application/check/ApplyCleanupUseCaseTest.java`
+- 目标文件：`backend/src/test/java/com/cooperation/application/packageartifact/ApplyCleanupSuggestionUseCaseTest.java`
 - 依赖：D027, D035
 - 内容：测试清理建议执行前校验权限，执行后对象进入回收站。
 - 验收：清理动作写入操作记录。
@@ -626,14 +626,14 @@
 
 ### Phase 3 / A020 创建应用层命令基类
 
-- 目标文件：`backend/src/main/java/com/cooperation/application/common/UseCaseCommand.java`
+- 目标文件：`backend/src/main/java/com/cooperation/application/common/ApplicationCommand.java`
 - 依赖：A001
 - 内容：定义命令对象标记接口，统一注释约束。
 - 验收：无业务逻辑。
 
 ### Phase 3 / A021 创建应用层结果基类
 
-- 目标文件：`backend/src/main/java/com/cooperation/application/common/UseCaseResult.java`
+- 目标文件：`backend/src/main/java/com/cooperation/application/common/ApplicationResult.java`
 - 依赖：A001
 - 内容：定义用例返回结果标记接口。
 - 验收：无框架依赖。
@@ -717,14 +717,14 @@
 
 ### Phase 3 / A033 实现打包检查用例
 
-- 目标文件：`backend/src/main/java/com/cooperation/application/check/RunPackageCheckUseCase.java`
+- 目标文件：`backend/src/main/java/com/cooperation/application/packageartifact/RunPackageCheckUseCase.java`
 - 依赖：A009, D026, D027
 - 内容：扫描项目文件树并生成检查报告和清理建议。
 - 验收：A009 通过。
 
 ### Phase 3 / A034 实现清理建议用例
 
-- 目标文件：`backend/src/main/java/com/cooperation/application/check/ApplyCleanupUseCase.java`
+- 目标文件：`backend/src/main/java/com/cooperation/application/packageartifact/ApplyCleanupSuggestionUseCase.java`
 - 依赖：A010, A022, A023, A024
 - 内容：清理建议执行时移入回收站而非永久删除。
 - 验收：A010 通过。
@@ -890,14 +890,14 @@
 
 ### Phase 4 / W012 创建错误响应 DTO
 
-- 目标文件：`backend/src/main/java/com/cooperation/web/dto/ErrorResponse.java`
+- 目标文件：`backend/src/main/java/com/cooperation/web/common/ApiResponse.java`
 - 依赖：W001
 - 内容：定义错误码、消息、字段错误列表。
 - 验收：接口测试可断言错误结构。
 
 ### Phase 4 / W013 创建全局异常处理器
 
-- 目标文件：`backend/src/main/java/com/cooperation/web/error/GlobalExceptionHandler.java`
+- 目标文件：`backend/src/main/java/com/cooperation/web/common/GlobalExceptionHandler.java`
 - 依赖：W012
 - 内容：将校验、权限、未找到、冲突异常映射到 HTTP 响应。
 - 验收：W004 可断言 403。
@@ -905,7 +905,7 @@
 ### Phase 4 / W014 [P] 创建分页响应 DTO
 
 - 标记：[P]
-- 目标文件：`backend/src/main/java/com/cooperation/web/dto/PageResponse.java`
+- 目标文件：`backend/src/main/java/com/cooperation/web/common/PageResponse.java`
 - 依赖：W001
 - 内容：定义列表数据、页码、页大小、总数。
 - 验收：列表类接口可复用。
@@ -1394,7 +1394,7 @@
 ### Phase 6 / U017 [P] 创建文件管理页面
 
 - 标记：[P]
-- 目标文件：`frontend/src/pages/FileManagerPage.vue`
+- 目标文件：`frontend/src/pages/ProjectWorkspacePage.vue`
 - 依赖：U008
 - 内容：展示目录树、文件列表、上传入口、移动重命名删除入口、回收站入口。
 - 验收：只显示文件列表和基本信息，不做复杂预览。
@@ -1483,7 +1483,7 @@
 ### Phase 6 / U027 [P] 编写首页组件测试
 
 - 标记：[P]
-- 目标文件：`frontend/src/pages/HomePage.spec.ts`
+- 目标文件：`frontend/src/pages/ProgressHomePage.spec.ts`
 - 依赖：U014
 - 内容：测试最近项目、小组筛选和项目搜索入口展示。
 - 验收：组件测试通过。
@@ -1491,7 +1491,7 @@
 ### Phase 6 / U028 [P] 编写文件管理组件测试
 
 - 标记：[P]
-- 目标文件：`frontend/src/pages/FileManagerPage.spec.ts`
+- 目标文件：`frontend/src/pages/ProjectWorkspacePage.spec.ts`
 - 依赖：U017, U018, U019
 - 内容：测试文件列表基本信息、同名弹窗、回收站入口。
 - 验收：组件测试通过。
@@ -1604,5 +1604,5 @@ F001 -> D001-D013 -> D014-D036 -> A001-A019 -> A020-A043 -> W001-W011 -> W012-W0
 - 内容：明确文件移动、目录状态更新、加入申请审核、成员权限更新、项目结束/重开、压缩包历史列表和删除为保留能力。
 - 验收：后续接口清理不得仅因当前页面入口不完整而删除这些能力。
 
-最后生成时间：2026-06-01 21:56:56
+最后生成时间：2026-06-04 08:39:30
 

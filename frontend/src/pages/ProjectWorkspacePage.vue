@@ -152,7 +152,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Box, Delete, Document, FolderOpened, Link, Refresh } from '@element-plus/icons-vue';
+import { Box, Delete, Document, FolderOpened, Link, Refresh, User } from '@element-plus/icons-vue';
 
 import FileListBlock from '@/components/project/FileListBlock.vue';
 import MainLayout from '@/layouts/MainLayout.vue';

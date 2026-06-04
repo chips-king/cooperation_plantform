@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cooperation.application.group.CreateGroupUseCase;
+import com.cooperation.application.group.DeleteGroupUseCase;
 import com.cooperation.application.group.GetGroupDetailUseCase;
 import com.cooperation.application.group.ListGroupsUseCase;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,6 +47,9 @@ class GroupControllerTest {
 
     @MockBean
     private GetGroupDetailUseCase getGroupDetailUseCase;
+
+    @MockBean
+    private DeleteGroupUseCase deleteGroupUseCase;
 
     /**
      * 创建小组成功时应返回统一成功结构，并把小组标识放在 data 中。

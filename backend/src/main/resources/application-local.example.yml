@@ -13,9 +13,15 @@ app:
   security:
     # aes-key 指定 SMTP 密码加密密钥，生产环境必须通过 APP_AES_KEY 注入真实随机值。
     aes-key: ${APP_AES_KEY:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+    # token-secret 指定登录令牌签名密钥，生产环境必须使用随机长字符串。
+    token-secret: ${APP_TOKEN_SECRET:change_token_secret_at_least_32_bytes}
   file-storage:
     # root 指定本地文件存储根目录，建议使用项目外可持久化目录。
     root: ${APP_FILE_STORAGE_ROOT:./data/storage}
+    # max-upload-bytes 指定单个上传文件大小上限，默认 100MiB。
+    max-upload-bytes: ${APP_MAX_UPLOAD_BYTES:104857600}
+    # max-package-download-bytes 指定最终压缩包下载大小上限，默认 200MiB。
+    max-package-download-bytes: ${APP_MAX_PACKAGE_DOWNLOAD_BYTES:209715200}
   mail:
     # provider 指定邮箱服务类型，可选值预留 qq、netease、platform-draft。
     provider: platform-draft

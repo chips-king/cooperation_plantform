@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.cooperation.application.project.CreateProjectUseCase;
+import com.cooperation.application.project.DeleteProjectUseCase;
 import com.cooperation.application.project.EndProjectUseCase;
 import com.cooperation.application.project.GetProjectDetailUseCase;
 import com.cooperation.application.project.ReopenProjectUseCase;
@@ -56,6 +57,9 @@ class ProjectControllerTest {
 
     @MockBean
     private ReopenProjectUseCase reopenProjectUseCase;
+
+    @MockBean
+    private DeleteProjectUseCase deleteProjectUseCase;
 
     @MockBean
     private ProjectRepository projectRepository;

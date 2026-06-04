@@ -223,7 +223,11 @@ public class JdbcDeploymentConfig {
     @Bean
     @ConditionalOnMissingBean
     @Primary
-    public DownloadLatestPackageUseCase jdbcDownloadLatestPackageUseCase(JdbcTemplate jdbcTemplate, StorageProperties storageProperties) {
+    public DownloadLatestPackageUseCase jdbcDownloadLatestPackageUseCase(
+            JdbcTemplate jdbcTemplate,
+            StorageProperties storageProperties,
+            @Value("${app.file-storage.max-package-download-bytes:209715200}") long maxPackageDownloadBytes
+    ) {
         JdbcPackageStore store = new JdbcPackageStore(jdbcTemplate);
         return command -> {
             QueryLatestPackageUseCase.Result latest = store.findLatestPackage(command.projectId())
@@ -239,10 +243,27 @@ public class JdbcDeploymentConfig {
                 throw new IllegalStateException("压缩包文件不存在，请重新生成");
             }
             try {
-                return new DownloadLatestPackageUseCase.Result(latest.filename(), "application/zip", Files.readAllBytes(file));
+                long fileSize = Files.size(file);
+                if (fileSize > maxPackageDownloadBytes) {
+                    throw new IllegalStateException("压缩包超过下载大小限制，请联系负责人拆分文件");
+                }
+                return new DownloadLatestPackageUseCase.Result(
+                        latest.filename(),
+                        packageContentType(latest.format()),
+                        Files.readAllBytes(file)
+                );
             } catch (java.io.IOException exception) {
                 throw new IllegalStateException("读取压缩包失败", exception);
             }
+        };
+    }
+
+    private static String packageContentType(String format) {
+        return switch (format) {
+            case "zip" -> "application/zip";
+            case "7z" -> "application/x-7z-compressed";
+            case "tar.gz" -> "application/gzip";
+            default -> "application/octet-stream";
         };
     }
 

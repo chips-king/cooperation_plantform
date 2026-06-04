@@ -2,7 +2,9 @@ package com.cooperation.web.packageartifact;
 
 import com.cooperation.application.packageartifact.ApplyCleanupSuggestionUseCase;
 import com.cooperation.application.packageartifact.CreatePackageUseCase;
+import com.cooperation.application.packageartifact.DeletePackageUseCase;
 import com.cooperation.application.packageartifact.DownloadLatestPackageUseCase;
+import com.cooperation.application.packageartifact.ListPackagesUseCase;
 import com.cooperation.application.packageartifact.QueryLatestPackageUseCase;
 import com.cooperation.application.packageartifact.RunPackageCheckUseCase;
 import com.cooperation.domain.check.CheckIssue;
@@ -64,6 +66,12 @@ class PackageControllerTest {
 
     @MockBean
     private DownloadLatestPackageUseCase downloadLatestPackageUseCase;
+
+    @MockBean
+    private DeletePackageUseCase deletePackageUseCase;
+
+    @MockBean
+    private ListPackagesUseCase listPackagesUseCase;
 
     /**
      * 打包检查应返回统一成功结构，并暴露 canContinuePackaging 与清理建议。

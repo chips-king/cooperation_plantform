@@ -24,6 +24,10 @@ const elementPlusMock = vi.hoisted(() => ({
 
 vi.mock('@/services/packageApi', () => packageApiMock);
 
+vi.mock('@/services/activityApi', () => ({
+  listNotifications: vi.fn().mockResolvedValue({ notifications: [] }),
+}));
+
 vi.mock('vue-router', () => ({
   RouterLink: {
     props: ['to'],
@@ -160,6 +164,7 @@ function createElementStubs(): Record<string, ReturnType<typeof defineComponent>
       emits: ['click'],
       template: '<button :disabled="disabled || loading" @click="$emit(\'click\', $event)"><slot /></button>',
     }),
+    ElBadge: passthrough,
     ElCard: passthrough,
     ElAside: passthrough,
     ElContainer: passthrough,
@@ -171,9 +176,22 @@ function createElementStubs(): Record<string, ReturnType<typeof defineComponent>
       props: { description: { type: String, default: '' } },
       template: '<div>{{ description }}</div>',
     }),
+    ElDropdown: defineComponent({
+      emits: ['command'],
+      template: '<div><slot /><slot name="dropdown" /></div>',
+    }),
+    ElDropdownItem: defineComponent({
+      props: {
+        command: { type: String, default: '' },
+        divided: { type: Boolean, default: false },
+      },
+      template: '<button type="button"><slot /></button>',
+    }),
+    ElDropdownMenu: passthrough,
     ElForm,
     ElFormItem: passthrough,
     ElHeader: passthrough,
+    ElIcon: passthrough,
     ElInput,
     ElMain: passthrough,
     ElRadioButton,

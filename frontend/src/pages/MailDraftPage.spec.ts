@@ -22,6 +22,10 @@ const packageApiMock = vi.hoisted(() => ({
   getLatestPackage: vi.fn(),
 }));
 
+const smtpConfigApiMock = vi.hoisted(() => ({
+  listSmtpConfigs: vi.fn(),
+}));
+
 const elementPlusMock = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
@@ -31,6 +35,7 @@ const elementPlusMock = vi.hoisted(() => ({
 
 vi.mock('@/services/mailApi', () => mailApiMock);
 vi.mock('@/services/packageApi', () => packageApiMock);
+vi.mock('@/services/smtpConfigApi', () => smtpConfigApiMock);
 
 const routerPush = vi.fn();
 
@@ -181,12 +186,21 @@ function createElementStubs(): Record<string, ReturnType<typeof defineComponent>
       props: { value: { type: [Number, String], default: 0 } },
       template: '<span><slot />{{ value }}</span>',
     }),
+    ElDivider: defineComponent({
+      template: '<span>|</span>',
+    }),
     ElEmpty: defineComponent({
       props: { description: { type: String, default: '' } },
       template: '<div>{{ description }}</div>',
     }),
     ElIcon: defineComponent({
       template: '<i><slot /></i>',
+    }),
+    ElOption: defineComponent({
+      template: '<option><slot /></option>',
+    }),
+    ElSelect: defineComponent({
+      template: '<select><slot /></select>',
     }),
   };
 }
@@ -263,6 +277,7 @@ describe('MailDraftPage', () => {
     routerPush.mockResolvedValue(undefined);
     mailApiMock.listProjectDrafts.mockResolvedValue([]);
     mailApiMock.listUserDraftSummaries.mockResolvedValue([]);
+    smtpConfigApiMock.listSmtpConfigs.mockResolvedValue([]);
     packageApiMock.getLatestPackage.mockResolvedValue({
       packageId: 'pkg-zip',
       filename: '课程项目成果.zip',

@@ -3,6 +3,7 @@ package com.cooperation.web.file;
 import com.cooperation.application.file.DeleteFileUseCase;
 import com.cooperation.application.file.DirectoryManagementUseCase;
 import com.cooperation.application.file.DownloadFileUseCase;
+import com.cooperation.application.file.EmptyTrashUseCase;
 import com.cooperation.application.file.ListDirectoryTreeUseCase;
 import com.cooperation.application.file.ListTrashFilesUseCase;
 import com.cooperation.application.file.MoveFileUseCase;
@@ -30,6 +31,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -39,6 +41,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -56,6 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(FileController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@TestPropertySource(properties = "app.file-storage.max-upload-bytes=1024")
 class FileControllerTest {
 
     /** 测试项目标识，用于确保接口始终限制在项目维度。 */
@@ -96,6 +100,9 @@ class FileControllerTest {
 
     @MockBean
     private DirectoryManagementUseCase directoryManagementUseCase;
+
+    @MockBean
+    private EmptyTrashUseCase emptyTrashUseCase;
 
     @Test
     @DisplayName("GET /projects/{projectId}/tree 返回目录树和文件列表")
@@ -257,6 +264,27 @@ class FileControllerTest {
                 .andExpect(jsonPath("$.data.options[0]").value("overwrite"))
                 .andExpect(jsonPath("$.data.options[1]").value("rename"))
                 .andExpect(jsonPath("$.data.options[2]").value("new_version"));
+    }
+
+    @Test
+    @DisplayName("POST /directories/{directoryId}/files 超过大小限制时拒绝上传")
+    void shouldRejectUploadWhenFileExceedsSizeLimit() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "large.bin",
+                MediaType.APPLICATION_OCTET_STREAM_VALUE,
+                new byte[1025]
+        );
+
+        mockMvc.perform(multipart("/directories/{directoryId}/files", DIRECTORY_ID)
+                        .file(file)
+                        .param("projectId", PROJECT_ID))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("上传文件不能超过 1024 字节"));
+
+        then(uploadFileUseCase).should(never()).upload(any());
     }
 
     @Test
